@@ -1,0 +1,12 @@
+{
+  "name": "mera-saarthi",
+  "tools": [
+    "codex"
+  ],
+  "language": "typescript",
+  "packageManager": "npm",
+  "defaultBranch": "main",
+  "skillPacks": [],
+  "profile": "minimal",
+  "preset": "minimal"
+}

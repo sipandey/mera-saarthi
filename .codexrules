@@ -1,0 +1,13 @@
+# Codex rules — Mera Saarthi
+
+Read `AGENTS.md` first and follow its Git identity, branch, push, and history rules.
+
+For non-trivial work:
+
+- Read `.agent-room/guardrails.md`, then check `.agent-room/decisions.md` and `.agent-room/anti-patterns.md` for relevant context.
+- Use only the existing `.agent-room/skills/` procedures that fit the task; the minimal scaffold intentionally has no `principles.md`, `workflow-classifier.md`, or session-log-format file.
+- Record non-obvious design choices in `.agent-room/decisions.md` and concrete root-cause lessons in `.agent-room/anti-patterns.md`.
+- Keep plans in `docs/plans/` and read-only research in `docs/research/` when useful.
+- Follow active user and system instructions about verification. Do not add or run tests unless asked.
+
+The Codex adapter is guidance-only. Do not describe guardrails as enforced by a hook or CI unless that mechanism is installed and has run.
