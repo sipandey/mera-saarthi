@@ -55,7 +55,7 @@ export default function App() {
   const [time, setTime] = useState('09:00');
   const [hours, setHours] = useState('4');
   const [destination, setDestination] = useState('');
-  const [pickupArea, setPickupArea] = useState('Main Market');
+  const [pickupArea, setPickupArea] = useState('');
   const [km, setKm] = useState('80');
   const [selectedCab, setSelectedCab] = useState<Cab | null>(null);
   const [newName, setNewName] = useState('');
@@ -128,6 +128,7 @@ export default function App() {
   const outstationFrom = cabsOpenForSearch.length ? formatRs(Math.min(...cabsOpenForSearch.map((cab) => cab.perKm))) : '—';
   const amountFor = (cab: Cab) => kind === 'local' ? (Number(hours) >= 8 ? cab.fullDay : cab.hourly * Math.max(1, Number(hours) || 1)) : cab.perKm * (Number(km) || 0);
   const openResults = () => {
+    if (!pickupArea.trim()) { Alert.alert(t('pickupArea'), t('pickupRequired')); return; }
     const rideAt = new Date(`${date}T${time}:00`);
     if (!Number.isFinite(rideAt.getTime()) || rideAt.getTime() < Date.now() || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
       Alert.alert(t('checkDateTime'), t('futureDateTime')); return;
@@ -222,15 +223,16 @@ export default function App() {
         if (!authName.trim()) { Alert.alert(t('enterName')); return; }
         const { data, error } = await supabase.auth.signUp({ phone, password: authPassword, options: { data: { full_name: authName.trim(), role: authRole } } });
         if (error) throw error;
-        if (!data.session) Alert.alert(
-          t('phoneConfirmation'),
-          t('disablePhoneConfirmation'),
-        );
+        if (!data.session) Alert.alert(t('phoneConfirmationRequired'), t('disablePhoneConfirmationForPasswordOnly'));
       } else {
         const { error } = await supabase.auth.signInWithPassword({ phone, password: authPassword });
         if (error) throw error;
       }
-    } catch (error) { Alert.alert(t('signInFailed'), error instanceof Error ? error.message : String(error)); }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const phoneSignupDisabled = authMode === 'signup' && /phone.{0,40}sign.?ups?.{0,20}disabled|sign.?ups?.{0,20}disabled.{0,40}phone/i.test(message);
+      Alert.alert(phoneSignupDisabled ? t('phoneSignupDisabled') : authMode === 'signup' ? t('signUpFailed') : t('signInFailed'), phoneSignupDisabled ? t('enablePhoneSignup') : message);
+    }
   };
 
   const header = (title: string, back?: () => void) => <AppHeader title={title} back={back} signedIn={Boolean(cloudUser)} hindi={hindi} onSignOut={() => supabase?.auth.signOut()} onToggleLanguage={() => setHindi(!hindi)} t={t} />;
@@ -254,9 +256,9 @@ export default function App() {
       {!supabaseReady && <Text style={styles.helper}>{t('supabaseMissing')}</Text>}
     </ScrollView></>;
   } else if (page === 'home') {
-    content = <>{header(t('customer'))}<CustomerHomeContent t={t} kind={kind} localFrom={localFrom} outstationFrom={outstationFrom} availableCabCount={cabsOpenForSearch.length} setKind={setKind} pickupArea={pickupArea} setPickupArea={setPickupArea} onSearch={() => setPage('search')} rolePicker={rolePicker()} />{bottomNav('home')}</>;
+    content = <>{header(t('customer'))}<CustomerHomeContent t={t} hindi={hindi} kind={kind} localFrom={localFrom} outstationFrom={outstationFrom} availableCabCount={cabsOpenForSearch.length} setKind={setKind} pickupArea={pickupArea} setPickupArea={setPickupArea} onSearch={() => setPage('search')} rolePicker={rolePicker()} />{bottomNav('home')}</>;
   } else if (page === 'search') {
-    content = <>{header(t('tripDetails'), () => setPage('home'))}<CustomerSearchContent t={t} kind={kind} pickupArea={pickupArea} setPickupArea={setPickupArea} vehicleType={vehicleType} setVehicleType={setVehicleType} date={date} setDate={setDate} time={time} setTime={setTime} hours={hours} setHours={setHours} destination={destination} setDestination={setDestination} km={km} setKm={setKm} onSearch={openResults} />{bottomNav('home')}</>;
+    content = <>{header(t('tripDetails'), () => setPage('home'))}<CustomerSearchContent t={t} hindi={hindi} kind={kind} pickupArea={pickupArea} setPickupArea={setPickupArea} vehicleType={vehicleType} setVehicleType={setVehicleType} date={date} setDate={setDate} time={time} setTime={setTime} hours={hours} setHours={setHours} destination={destination} setDestination={setDestination} km={km} setKm={setKm} onSearch={openResults} />{bottomNav('home')}</>;
   } else if (page === 'results') {
     content = <>{header(t('nearby'), () => setPage('search'))}<SearchResultsContent hindi={hindi} t={t} kind={kind} vehicleType={vehicleType} pickupArea={pickupArea} date={date} time={time} hours={hours} destination={destination} km={km} results={results} onSelectCab={reviewCab} rolePicker={rolePicker()} />{bottomNav('results')}</>;
   } else if (page === 'confirm' && selectedCab) {

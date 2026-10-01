@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { BookingCard } from '../components/BookingCard';
 import { CabCard } from '../components/CabCard';
 import { ChoiceChip, FormField, PrimaryButton, VehicleTypePicker } from '../components/Primitives';
+import { LocationPicker } from '../components/LocationPicker';
 import { styles } from '../theme';
 import type { Booking, Cab, Hire, VehicleType } from '../types';
 
@@ -17,6 +18,7 @@ export function CustomerHomeContent({
   setKind,
   pickupArea,
   setPickupArea,
+  hindi,
   onSearch,
   rolePicker,
 }: {
@@ -28,6 +30,7 @@ export function CustomerHomeContent({
   setKind: (value: Hire) => void;
   pickupArea: string;
   setPickupArea: (value: string) => void;
+  hindi: boolean;
   onSearch: () => void;
   rolePicker: ReactNode;
 }) {
@@ -43,8 +46,7 @@ export function CustomerHomeContent({
         <Text style={styles.homeTitle}>{t('where')}</Text>
         <View style={styles.pickupCard}>
           <View style={styles.pickupPin}><Text style={styles.pickupPinText}>⌖</Text></View>
-          <View style={styles.pickupCopy}><Text style={styles.pickupLabel}>{t('pickupArea')}</Text><FormField label="" value={pickupArea} onChange={setPickupArea} placeholder={t('pickupPlaceholder')} /></View>
-          <Text style={styles.pickupChevron}>›</Text>
+          <View style={styles.pickupCopy}><LocationPicker label={t('pickupArea')} value={pickupArea} onChange={setPickupArea} placeholder={t('pickupPlaceholder')} t={t} hindi={hindi} /></View>
         </View>
       </View>
 
@@ -68,10 +70,10 @@ export function CustomerHomeContent({
 }
 
 export function CustomerSearchContent({
-  t, kind, pickupArea, setPickupArea, vehicleType, setVehicleType, date, setDate, time, setTime,
+  t, kind, pickupArea, setPickupArea, hindi, vehicleType, setVehicleType, date, setDate, time, setTime,
   hours, setHours, destination, setDestination, km, setKm, onSearch,
 }: {
-  t: Translate; kind: Hire; pickupArea: string; setPickupArea: (value: string) => void;
+  t: Translate; kind: Hire; pickupArea: string; setPickupArea: (value: string) => void; hindi: boolean;
   vehicleType: VehicleType | 'Any'; setVehicleType: (value: VehicleType | 'Any') => void;
   date: string; setDate: (value: string) => void; time: string; setTime: (value: string) => void;
   hours: string; setHours: (value: string) => void; destination: string; setDestination: (value: string) => void;
@@ -81,7 +83,7 @@ export function CustomerSearchContent({
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.summaryPanel}><Text style={styles.summaryTitle}>{kind === 'local' ? t('local') : t('outstation')}</Text><Text style={styles.summaryText}>{pickupArea}</Text></View>
       <View style={styles.panel}>
-        <FormField label={t('pickupArea')} value={pickupArea} onChange={setPickupArea} placeholder={t('pickupPlaceholder')} />
+        <LocationPicker label={t('pickupArea')} value={pickupArea} onChange={setPickupArea} placeholder={t('pickupPlaceholder')} t={t} hindi={hindi} />
         <View style={styles.twoCol}><FormField label={t('date')} value={date} onChange={setDate} placeholder={t('datePlaceholder')} /><FormField label={t('time')} value={time} onChange={setTime} placeholder={t('timePlaceholder')} /></View>
         <Text style={styles.fieldLabel}>{t('vehicle')}</Text><VehicleTypePicker current={vehicleType} onPick={setVehicleType} t={t} />
         {kind === 'local' ? <><Text style={styles.fieldLabel}>{t('hours')} · {t('fullDayThreshold')}</Text><View style={styles.quickRow}>{[2, 4, 8, 12].map((value) => <ChoiceChip key={value} label={`${value} ${t('hoursShort')}`} active={Number(hours) === value} onPress={() => setHours(`${value}`)} />)}</View></> : <>
