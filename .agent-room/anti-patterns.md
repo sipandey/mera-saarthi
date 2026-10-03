@@ -21,6 +21,12 @@ Append a new entry every time:
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-02 — do not let pending requests block slots forever
+
+**What happened:** A pending booking was treated as an active slot conflict indefinitely, even when its owner stopped using the app.
+**Root cause:** The database had no expiry timestamp/state and the slot trigger considered every pending row active.
+**Avoid:** Give pending requests a server expiry, exclude stale pending rows inside the slot trigger, and record the terminal transition on refresh or scheduled cleanup.
+
 ### 2026-10-01 — do not bias autocomplete to a fixed point
 
 **What happened:** Place suggestions could favor the wrong part of India before the user shared device location.

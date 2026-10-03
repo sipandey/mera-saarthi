@@ -71,13 +71,13 @@ export function CustomerHomeContent({
 
 export function CustomerSearchContent({
   t, kind, pickupArea, setPickupArea, hindi, vehicleType, setVehicleType, date, setDate, time, setTime,
-  hours, setHours, destination, setDestination, km, setKm, onSearch,
+  hours, setHours, destination, setDestination, onSearch,
 }: {
   t: Translate; kind: Hire; pickupArea: string; setPickupArea: (value: string) => void; hindi: boolean;
   vehicleType: VehicleType | 'Any'; setVehicleType: (value: VehicleType | 'Any') => void;
   date: string; setDate: (value: string) => void; time: string; setTime: (value: string) => void;
   hours: string; setHours: (value: string) => void; destination: string; setDestination: (value: string) => void;
-  km: string; setKm: (value: string) => void; onSearch: () => void;
+  onSearch: () => void;
 }) {
   return (
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -88,9 +88,8 @@ export function CustomerSearchContent({
         <Text style={styles.fieldLabel}>{t('vehicle')}</Text><VehicleTypePicker current={vehicleType} onPick={setVehicleType} t={t} />
         {kind === 'local' ? <><Text style={styles.fieldLabel}>{t('hours')} · {t('fullDayThreshold')}</Text><View style={styles.quickRow}>{[2, 4, 8, 12].map((value) => <ChoiceChip key={value} label={`${value} ${t('hoursShort')}`} active={Number(hours) === value} onPress={() => setHours(`${value}`)} />)}</View></> : <>
           <FormField label={t('destination')} value={destination} onChange={setDestination} placeholder={t('destinationPlaceholder')} />
-          <FormField label={t('distance')} value={km} onChange={setKm} keyboardType="numeric" />
           <Text style={styles.helper}>{t('outstationDistanceNote')}</Text>
-          <FormField label={t('tripDuration')} value={hours} onChange={setHours} placeholder="4" keyboardType="numeric" />
+          <FormField label={t('estimatedTripDuration')} value={hours} onChange={setHours} placeholder="4" keyboardType="numeric" />
         </>}
         <PrimaryButton label={t('findAvailableCabs')} onPress={onSearch} />
       </View>
@@ -108,9 +107,10 @@ export function SearchResultsContent({
   time,
   hours,
   destination,
-  km,
   results,
   onSelectCab,
+  onAnyVehicle,
+  onChangeSearch,
   rolePicker,
 }: {
   hindi: boolean;
@@ -122,16 +122,17 @@ export function SearchResultsContent({
   time: string;
   hours: string;
   destination: string;
-  km: string;
   results: Cab[];
   onSelectCab: (cab: Cab) => void;
+  onAnyVehicle: () => void;
+  onChangeSearch: () => void;
   rolePicker: ReactNode;
 }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.summaryPanel}><Text style={styles.summaryTitle}>{kind === 'local' ? t('local') : t('outstation')} · {vehicleType === 'Any' ? t('anyVehicle') : t(`vehicle${vehicleType}`)}</Text><Text style={styles.summaryText}>{pickupArea} · {date} · {time}{kind === 'local' ? ` · ${hours} ${t('hours')}` : ` · ${destination} · ${km} ${t('kmUnit')} (${t('oneWay')})`}</Text></View>
+      <View style={styles.summaryPanel}><Text style={styles.summaryTitle}>{kind === 'local' ? t('local') : t('outstation')} · {vehicleType === 'Any' ? t('anyVehicle') : t(`vehicle${vehicleType}`)}</Text><Text style={styles.summaryText}>{pickupArea} · {date} · {time}{kind === 'local' ? ` · ${hours} ${t('hours')}` : ` · ${destination}`}</Text></View>
       <Text style={styles.sectionTitle}>{results.length} {t('cabsFound')}</Text>
-      {results.length ? results.map((cab) => <CabCard key={cab.id} cab={cab} kind={kind} hours={hours} km={km} hindi={hindi} t={t} onBook={() => onSelectCab(cab)} />) : <View style={styles.empty}><Text style={styles.emptyEmoji}>🚕</Text><Text style={styles.emptyText}>{t('noResults')}</Text></View>}
+      {results.length ? results.map((cab) => <CabCard key={cab.id} cab={cab} kind={kind} hours={hours} hindi={hindi} t={t} onBook={() => onSelectCab(cab)} />) : <View style={styles.empty}><Text style={styles.emptyEmoji}>🚕</Text><Text style={styles.cabName}>{t('noResultsTitle')}</Text><Text style={styles.emptyText}>{t('noResults')}</Text>{vehicleType !== 'Any' && <Pressable accessibilityRole="button" onPress={onAnyVehicle} style={styles.cancelLink}><Text style={styles.confirmationEditText}>{t('anyVehicle')}</Text></Pressable>}<Pressable accessibilityRole="button" onPress={onChangeSearch} style={styles.cancelLink}><Text style={styles.confirmationEditText}>{t('changeSearch')}</Text></Pressable></View>}
       {rolePicker}
     </ScrollView>
   );

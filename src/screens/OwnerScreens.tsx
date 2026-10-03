@@ -12,6 +12,9 @@ export function OwnerDashboardContent({
   owned,
   bookings,
   ownerName,
+  ownerReviewStatus,
+  pushState,
+  focusBookingId,
   hindi,
   t,
   rolePicker,
@@ -19,10 +22,14 @@ export function OwnerDashboardContent({
   onEditVehicle,
   onToggleAvailability,
   onChangeStatus,
+  onEnablePush,
 }: {
   owned: Cab[];
   bookings: Booking[];
   ownerName: string;
+  ownerReviewStatus?: 'pending' | 'approved' | 'rejected' | null;
+  pushState: 'idle' | 'setting_up' | 'ready' | 'needs_project' | 'permission_denied' | 'unsupported' | 'error';
+  focusBookingId?: string | null;
   hindi: boolean;
   t: Translate;
   rolePicker: ReactNode;
@@ -30,7 +37,11 @@ export function OwnerDashboardContent({
   onEditVehicle: (cab: Cab) => void;
   onToggleAvailability: (cabId: string, available: boolean) => void;
   onChangeStatus: (id: string, status: Booking['status']) => void;
+  onEnablePush: () => void;
 }) {
+  const orderedBookings = focusBookingId
+    ? [...bookings].sort((a, b) => Number(b.id === focusBookingId) - Number(a.id === focusBookingId))
+    : bookings;
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.ownerHero}>
@@ -39,16 +50,20 @@ export function OwnerDashboardContent({
         <Text style={styles.ownerHeroNumber}>{bookings.filter((booking) => booking.status === 'pending').length}</Text>
         <Text style={styles.ownerHeroCaption}>{t('requestsWaiting')}</Text>
       </View>
+      {ownerReviewStatus && ownerReviewStatus !== 'approved' && <View style={styles.summaryPanel}><Text style={styles.summaryTitle}>{ownerReviewStatus === 'rejected' ? t('approvalRejected') : t('approvalPending')}</Text></View>}
+      {ownerReviewStatus === 'approved' && <View style={styles.summaryPanel}><Text style={styles.summaryTitle}>{t(pushState === 'ready' ? 'pushReady' : pushState === 'idle' ? 'pushNotEnabled' : pushState === 'setting_up' ? 'pushSettingUp' : pushState === 'permission_denied' ? 'pushPermissionDenied' : pushState === 'unsupported' ? 'pushUnsupported' : pushState === 'needs_project' ? 'pushNeedsProject' : 'pushFailed')}</Text>{['idle', 'permission_denied', 'error'].includes(pushState) && <Pressable accessibilityRole="button" onPress={onEnablePush}><Text style={styles.confirmationEditText}>{t('enableAlerts')}</Text></Pressable>}</View>}
       <View style={styles.sectionLine}><Text style={styles.sectionTitle}>{t('myVehicle')}</Text><Pressable accessibilityRole="button" onPress={onAddVehicle}><Text style={styles.addLink}>＋ {t('addVehicle')}</Text></Pressable></View>
-      {owned.map((cab) => <View key={cab.id} style={styles.ownerCab}>
-        <View style={styles.ownerCabTop}><View style={styles.carIcon}><Text style={styles.carIconText}>🚕</Text></View><View style={{ flex: 1 }}><Text style={styles.cabName}>{cab.name}</Text><Text style={styles.cabMeta}>{t(`vehicle${cab.type}`)} · {cab.seats} {t('seats')}</Text><Text style={styles.availabilityLabel}>{cab.available ? t('cabAvailable') : t('cabUnavailable')}</Text></View><Switch accessibilityLabel={t('availability')} value={cab.available} onValueChange={(value) => onToggleAvailability(cab.id, value)} trackColor={{ true: C.green }} />
+      {owned.map((cab) => { const lastUpdated = cab.availabilityUpdatedAt ? new Date(cab.availabilityUpdatedAt).getTime() : 0; const stale = lastUpdated > 0 && Date.now() - lastUpdated > 86400000; return <View key={cab.id} style={styles.ownerCab}>
+        <View style={styles.ownerCabTop}><View style={styles.carIcon}><Text style={styles.carIconText}>🚕</Text></View><View style={{ flex: 1 }}><Text style={styles.cabName}>{cab.name}</Text><Text style={styles.cabMeta}>{t(`vehicle${cab.type}`)} · {cab.seats} {t('seats')}</Text><Text style={styles.cabMeta}>{t('vehicleRegistration')}: {cab.registrationNumber || '—'}</Text><Text style={styles.availabilityLabel}>{cab.reviewStatus === 'approved' ? (cab.available ? t('cabAvailable') : t('cabUnavailable')) : cab.reviewStatus === 'rejected' ? t('vehicleApprovalRejected') : t('vehicleApprovalPending')}</Text>{(cab.availabilityStart && cab.availabilityEnd) && <Text style={styles.cabMeta}>{cab.availabilityStart.slice(0, 5)}–{cab.availabilityEnd.slice(0, 5)}</Text>}{cab.availabilityUpdatedAt && <Text style={styles.cabMeta}>{t('lastUpdated')} {cab.availabilityUpdatedAt.slice(0, 16).replace('T', ' ')}</Text>}</View><Switch accessibilityLabel={t('availability')} value={cab.available} disabled={cab.reviewStatus !== 'approved' || ownerReviewStatus !== 'approved'} onValueChange={(value) => onToggleAvailability(cab.id, value)} trackColor={{ true: C.green }} />
         </View>
         <View style={styles.rule} />
         <View style={styles.ratesRow}><Text style={styles.ownerRate}>{t('hourly')} {formatRs(cab.hourly)}</Text><Text style={styles.ownerRate}>{t('fullDay')} {formatRs(cab.fullDay)}</Text><Text style={styles.ownerRate}>{t('perKm')} {formatRs(cab.perKm)}</Text></View>
         <Pressable accessibilityRole="button" onPress={() => onEditVehicle(cab)}><Text style={styles.addLink}>{t('editVehicle')}  ✎</Text></Pressable>
-      </View>)}
+        {stale && <Text style={styles.bookingHelper}>{t('availabilityStale')}</Text>}
+      </View>; })}
+      {focusBookingId && orderedBookings.some((booking) => booking.id === focusBookingId) && <View style={styles.summaryPanel}><Text style={styles.summaryTitle}>{t('openedRequest')}</Text></View>}
       <View style={styles.sectionLine}><Text style={styles.sectionTitle}>{t('upcoming')}</Text><Text style={styles.countBubble}>{bookings.length}</Text></View>
-      {bookings.length ? bookings.map((booking) => <BookingCard key={booking.id} booking={booking} ownerActions hindi={hindi} t={t} onChangeStatus={onChangeStatus} />) : <Text style={styles.emptyText}>{t('noBooking')}</Text>}
+      {orderedBookings.length ? orderedBookings.map((booking) => <BookingCard key={booking.id} booking={booking} ownerActions hindi={hindi} t={t} onChangeStatus={onChangeStatus} />) : <Text style={styles.emptyText}>{t('noBooking')}</Text>}
       {rolePicker}
     </ScrollView>
   );
@@ -69,6 +84,12 @@ export function VehicleFormContent({
   setNewFullDay,
   newPerKm,
   setNewPerKm,
+  registrationNumber,
+  setRegistrationNumber,
+  availabilityStart,
+  setAvailabilityStart,
+  availabilityEnd,
+  setAvailabilityEnd,
   onSave,
 }: {
   hindi: boolean;
@@ -85,6 +106,12 @@ export function VehicleFormContent({
   setNewFullDay: (value: string) => void;
   newPerKm: string;
   setNewPerKm: (value: string) => void;
+  registrationNumber: string;
+  setRegistrationNumber: (value: string) => void;
+  availabilityStart: string;
+  setAvailabilityStart: (value: string) => void;
+  availabilityEnd: string;
+  setAvailabilityEnd: (value: string) => void;
   onSave: () => void;
 }) {
   return (
@@ -92,6 +119,7 @@ export function VehicleFormContent({
       <View style={styles.panel}>
         <Text style={styles.sectionTitle}>{t('vehicleDetails')}</Text>
         <FormField label={t('vehicleName')} value={newName} onChange={setNewName} placeholder={t('vehiclePlaceholder')} />
+        <FormField label={t('registrationNumber')} value={registrationNumber} onChange={setRegistrationNumber} placeholder={t('registrationPlaceholder')} autoCapitalize="characters" />
         <Text style={styles.fieldLabel}>{t('vehicle')}</Text>
         <View style={styles.chipRow}>{VEHICLES.map((value) => <ChoiceChip key={value} label={t(`vehicle${value}`)} active={newType === value} onPress={() => setNewType(value)} />)}</View>
         <FormField label={t('seats')} value={newSeats} onChange={setNewSeats} keyboardType="numeric" />
@@ -100,6 +128,9 @@ export function VehicleFormContent({
         <FormField label={`${t('hourly')} (₹)`} value={newHourly} onChange={setNewHourly} keyboardType="numeric" />
         <FormField label={`${t('fullDay')} (₹)`} value={newFullDay} onChange={setNewFullDay} keyboardType="numeric" />
         <FormField label={t('rateOutstation')} value={newPerKm} onChange={setNewPerKm} keyboardType="numeric" />
+        <Text style={styles.sectionTitle}>{t('availableHours')}</Text>
+        <Text style={styles.helper}>{t('hoursNote')}</Text>
+        <View style={styles.twoCol}><FormField label={t('availableFrom')} value={availabilityStart} onChange={setAvailabilityStart} placeholder="09:00" /><FormField label={t('availableUntil')} value={availabilityEnd} onChange={setAvailabilityEnd} placeholder="18:00" /></View>
         <PrimaryButton label={t('save')} onPress={onSave} />
       </View>
     </ScrollView>

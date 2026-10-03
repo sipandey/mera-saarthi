@@ -39,6 +39,7 @@ export function FormField({
   placeholder = '',
   keyboardType = 'default',
   secureTextEntry = false,
+  autoCapitalize,
 }: {
   label: string;
   value: string;
@@ -46,6 +47,7 @@ export function FormField({
   placeholder?: string;
   keyboardType?: KeyboardTypeOptions;
   secureTextEntry?: boolean;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
 }) {
   return (
     <View style={styles.fieldWrap}>
@@ -57,6 +59,7 @@ export function FormField({
         placeholderTextColor="#78716C"
         keyboardType={keyboardType}
         secureTextEntry={secureTextEntry}
+        autoCapitalize={autoCapitalize}
         style={styles.input}
       />
     </View>

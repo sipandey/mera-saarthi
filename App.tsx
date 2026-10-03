@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import * as Notifications from 'expo-notifications';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -11,18 +12,19 @@ import {
   Text,
   View,
 } from 'react-native';
-import { loadCloudData, createCloudBooking, setCloudBookingStatus, saveCloudVehicle, editCloudVehicle, updateCloudAvailability, setCloudAccountBlocked, setCloudVehicleAvailability } from './src/cloudData';
+import { loadCloudData, createCloudBooking, setCloudBookingStatus, saveCloudVehicle, editCloudVehicle, updateCloudAvailability, setCloudAccountBlocked, setCloudOwnerReviewStatus, setCloudVehicleReviewStatus, setCloudVehicleBlocked, saveCloudPushToken, removeCloudPushToken, trackPilotEvent } from './src/cloudData';
 import { supabase, supabaseReady } from './src/supabase';
 import { C, styles } from './src/theme';
 import { translate, type CopyKey } from './src/i18n';
 import { defaultDate, formatRs } from './src/utils';
-import type { Account, Booking, Cab, Hire, Role, Store, VehicleType } from './src/types';
+import type { Account, Booking, BookingStatus, Cab, Hire, ReviewStatus, Role, Store, VehicleType } from './src/types';
 import { AppHeader, FormField, PrimaryButton, RolePicker } from './src/components/Primitives';
 import { BookingConfirmation } from './src/components/BookingConfirmation';
 import { BottomNavigation } from './src/components/BottomNavigation';
 import { CustomerBookingsContent, CustomerHomeContent, CustomerSearchContent, SearchResultsContent } from './src/screens/CustomerScreens';
 import { OwnerDashboardContent, VehicleFormContent } from './src/screens/OwnerScreens';
 import { AdminScreen } from './src/screens/AdminScreen';
+import { registerOwnerPushNotifications } from './src/pushNotifications';
 
 const KEY = 'mera-saarthi-demo-v1';
 const INITIAL: Store = {
@@ -31,7 +33,24 @@ const INITIAL: Store = {
     { id: 'cab-b', ownerId: 'owner-b', ownerName: 'Suresh Yadav', phone: '98765 12340', name: 'Mahindra Bolero', type: 'SUV', seats: 7, available: true, hourly: 250, fullDay: 2000, perKm: 16 },
     { id: 'cab-c', ownerId: 'owner-c', ownerName: 'Amit Patel', phone: '98765 56780', name: 'Maruti Dzire', type: 'Sedan', seats: 4, available: true, hourly: 200, fullDay: 1600, perKm: 14 },
   ],
-  bookings: [], blockedOwners: [], blockedCustomers: [], blockedVehicles: [], customerName: 'Guest Customer', profiles: [],
+  bookings: [], blockedOwners: [], blockedCustomers: [], blockedVehicles: [], customerName: 'Guest Customer', profiles: [], metrics: [],
+};
+
+const requestKey = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+  const random = Math.floor(Math.random() * 16);
+  return (character === 'x' ? random : (random & 0x3) | 0x8).toString(16);
+});
+
+const withinAvailability = (cab: Cab, pickupTime: string, durationHours: number) => {
+  if (!cab.availabilityStart || !cab.availabilityEnd) return true;
+  const toMinutes = (value: string) => {
+    const [hours, minutes] = value.slice(0, 5).split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+  const start = toMinutes(cab.availabilityStart);
+  const end = toMinutes(cab.availabilityEnd);
+  const requestedStart = toMinutes(pickupTime);
+  return requestedStart >= start && requestedStart + durationHours * 60 <= end;
 };
 
 export default function App() {
@@ -56,7 +75,6 @@ export default function App() {
   const [hours, setHours] = useState('4');
   const [destination, setDestination] = useState('');
   const [pickupArea, setPickupArea] = useState('');
-  const [km, setKm] = useState('80');
   const [selectedCab, setSelectedCab] = useState<Cab | null>(null);
   const [newName, setNewName] = useState('');
   const [editingCabId, setEditingCabId] = useState<string | null>(null);
@@ -65,6 +83,16 @@ export default function App() {
   const [newHourly, setNewHourly] = useState('220');
   const [newFullDay, setNewFullDay] = useState('1800');
   const [newPerKm, setNewPerKm] = useState('15');
+  const [newRegistration, setNewRegistration] = useState('');
+  const [newAvailabilityStart, setNewAvailabilityStart] = useState('');
+  const [newAvailabilityEnd, setNewAvailabilityEnd] = useState('');
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const bookingRequestKey = useRef<string | null>(null);
+  const bookingInFlight = useRef(false);
+  const [syncIssue, setSyncIssue] = useState(false);
+  const [pushState, setPushState] = useState<'idle' | 'setting_up' | 'ready' | 'needs_project' | 'permission_denied' | 'unsupported' | 'error'>('idle');
+  const [focusBookingId, setFocusBookingId] = useState<string | null>(null);
+  const pushToken = useRef<string | null>(null);
 
   const t = (key: string) => translate(key as CopyKey, hindi ? 'hi' : 'en');
   useEffect(() => {
@@ -82,7 +110,7 @@ export default function App() {
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) { setCloudUser({ id: session.user.id, phone: session.user.phone }); setDemoMode(false); }
-      else { setCloudUser(null); setProfile(null); setPage('auth'); setRole('customer'); }
+      else { setCloudUser(null); setProfile(null); setPage('auth'); setRole('customer'); setPushState('idle'); setFocusBookingId(null); pushToken.current = null; }
     });
     return () => listener.subscription.unsubscribe();
   }, []);
@@ -92,7 +120,7 @@ export default function App() {
     let active = true;
     setCloudLoading(true);
     (async () => {
-      const { data: profileData, error } = await supabase.from('profiles').select('id, role, full_name, phone, is_blocked').eq('id', cloudUser.id).single();
+      const { data: profileData, error } = await supabase.from('profiles').select('id, role, full_name, phone, is_blocked, owner_review_status').eq('id', cloudUser.id).single();
       if (error) throw new Error(error.message);
       if (profileData.is_blocked) {
         await supabase.auth.signOut();
@@ -102,10 +130,10 @@ export default function App() {
       if (!active) return;
       const account = profileData as Account;
       setProfile(account); setRole(account.role);
-      setStore((current) => ({ ...INITIAL, ...current, blockedOwners: [], blockedCustomers: [], blockedVehicles: [], cabs: loaded.cabs, bookings: loaded.bookings, customerName: account.full_name || t('customerGeneric'), profiles: loaded.profiles }));
+      setStore((current) => ({ ...INITIAL, ...current, blockedOwners: [], blockedCustomers: [], blockedVehicles: [], cabs: loaded.cabs, bookings: loaded.bookings, customerName: account.full_name || t('customerGeneric'), profiles: loaded.profiles, metrics: loaded.metrics }));
       setPage(account.role === 'customer' ? 'home' : account.role === 'owner' ? 'owner' : 'admin');
     })().catch((error: unknown) => {
-      if (active) Alert.alert(t('loadFailed'), error instanceof Error ? error.message : String(error));
+      if (active) { setSyncIssue(true); Alert.alert(t('loadFailed'), error instanceof Error ? error.message : String(error)); }
     }).finally(() => { if (active) setCloudLoading(false); });
     return () => { active = false; };
   }, [cloudUser?.id]);
@@ -113,73 +141,143 @@ export default function App() {
   const results = useMemo(() => {
     const requestedStart = new Date(`${date}T${time}:00`).getTime();
     const requestedEnd = requestedStart + Math.max(1, Number(hours) || 1) * 60 * 60 * 1000;
-    return store.cabs.filter((cab) => {
+    const available = store.cabs.filter((cab) => {
       const conflict = Number.isFinite(requestedStart) && store.bookings.some((b) => {
         if (b.cabId !== cab.id || !['pending', 'accepted'].includes(b.status)) return false;
         const start = new Date(`${b.date}T${b.time}:00`).getTime();
         const end = start + Math.max(1, b.hours || 1) * 60 * 60 * 1000;
         return Number.isFinite(start) && requestedStart < end && start < requestedEnd;
       });
-      return cab.available && !cab.blocked && !store.blockedVehicles.includes(cab.id) && !store.blockedOwners.includes(cab.ownerId) && (vehicleType === 'Any' || cab.type === vehicleType) && !conflict;
+      return cab.available && cab.reviewStatus !== 'pending' && cab.reviewStatus !== 'rejected' && !cab.blocked && !store.blockedVehicles.includes(cab.id) && !store.blockedOwners.includes(cab.ownerId) && (vehicleType === 'Any' || cab.type === vehicleType) && withinAvailability(cab, time, Math.max(1, Number(hours) || 1)) && !conflict;
     });
-  }, [store, vehicleType, date, time, hours]);
+    const quote = (cab: Cab) => kind === 'local'
+      ? (Number(hours) >= 8 ? cab.fullDay : cab.hourly * Math.max(1, Number(hours) || 1))
+      : cab.perKm;
+    return available.sort((a, b) => quote(a) - quote(b) || a.name.localeCompare(b.name));
+  }, [store, vehicleType, date, time, hours, kind]);
   const cabsOpenForSearch = store.cabs.filter((cab) => cab.available && !cab.blocked && !store.blockedVehicles.includes(cab.id) && !store.blockedOwners.includes(cab.ownerId));
   const localFrom = cabsOpenForSearch.length ? formatRs(Math.min(...cabsOpenForSearch.map((cab) => cab.fullDay))) : '—';
   const outstationFrom = cabsOpenForSearch.length ? formatRs(Math.min(...cabsOpenForSearch.map((cab) => cab.perKm))) : '—';
-  const amountFor = (cab: Cab) => kind === 'local' ? (Number(hours) >= 8 ? cab.fullDay : cab.hourly * Math.max(1, Number(hours) || 1)) : cab.perKm * (Number(km) || 0);
+  const amountFor = (cab: Cab) => kind === 'local' ? (Number(hours) >= 8 ? cab.fullDay : cab.hourly * Math.max(1, Number(hours) || 1)) : 0;
   const openResults = () => {
     if (!pickupArea.trim()) { Alert.alert(t('pickupArea'), t('pickupRequired')); return; }
     const rideAt = new Date(`${date}T${time}:00`);
     if (!Number.isFinite(rideAt.getTime()) || rideAt.getTime() < Date.now() || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
       Alert.alert(t('checkDateTime'), t('futureDateTime')); return;
     }
-    if ((kind === 'local' && (Number(hours) < 1 || !Number.isFinite(Number(hours)))) || (kind === 'outstation' && (Number(km) < 1 || Number(hours) < 1))) {
+    if (Number(hours) < 1 || !Number.isFinite(Number(hours))) {
       Alert.alert(t('checkTrip'), t('validTrip')); return;
     }
     if (kind === 'outstation' && !destination.trim()) { Alert.alert(t('addDestination'), t('enterDestination')); return; }
+    if (cloudUser) {
+      trackPilotEvent('search').catch(() => undefined);
+      trackPilotEvent('results_view').catch(() => undefined);
+    }
     setPage('results');
   };
   const refreshCloud = async () => {
     if (!cloudUser || !profile) return;
-    const loaded = await loadCloudData(cloudUser.id, profile.role, profile.full_name, profile.phone);
-    setStore((current) => ({ ...current, cabs: loaded.cabs, bookings: loaded.bookings, profiles: loaded.profiles }));
+    try {
+      const { data: profileData, error: profileError } = await supabase!.from('profiles').select('id, role, full_name, phone, is_blocked, owner_review_status').eq('id', cloudUser.id).single();
+      if (profileError) throw profileError;
+      if (profileData.is_blocked) {
+        await supabase!.auth.signOut();
+        throw new Error(t('blockedAccount'));
+      }
+      const account = profileData as Account;
+      const loaded = await loadCloudData(cloudUser.id, account.role, account.full_name, account.phone);
+      setStore((current) => ({ ...current, cabs: loaded.cabs, bookings: loaded.bookings, profiles: loaded.profiles, metrics: loaded.metrics }));
+      setProfile(account);
+      setRole(account.role);
+      setSyncIssue(false);
+    } catch (error) {
+      setSyncIssue(true);
+      throw error;
+    }
   };
   useEffect(() => {
     if (!cloudUser || !profile) return;
     const timer = setInterval(() => { refreshCloud().catch(() => undefined); }, 30000);
     return () => clearInterval(timer);
   }, [cloudUser?.id, profile?.id]);
+  const enablePush = async (ownerId: string) => {
+    setPushState('setting_up');
+    try {
+      const registration = await registerOwnerPushNotifications();
+      if (registration.status !== 'ready') {
+        setPushState(registration.status);
+        return;
+      }
+      await saveCloudPushToken(ownerId, registration.token);
+      pushToken.current = registration.token;
+      setPushState('ready');
+    } catch {
+      setPushState('error');
+    }
+  };
+  useEffect(() => {
+    if (!cloudUser || profile?.role !== 'owner') return;
+    const handleResponse = (response: Notifications.NotificationResponse) => {
+      const bookingId = response.notification.request.content.data?.bookingId;
+      if (typeof bookingId !== 'string') return;
+      setFocusBookingId(bookingId);
+      setPage('owner');
+      refreshCloud().catch(() => undefined);
+    };
+    const initial = Notifications.getLastNotificationResponse();
+    if (initial) handleResponse(initial);
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
+    return () => subscription.remove();
+  }, [cloudUser?.id, profile?.role]);
   const createBooking = async (cab: Cab) => {
+    if (bookingInFlight.current) return;
+    bookingInFlight.current = true;
+    setBookingSubmitting(true);
+    const submissionKey = bookingRequestKey.current ?? requestKey();
+    bookingRequestKey.current = submissionKey;
     const item: Booking = {
       id: `ride-${Date.now()}`, cabId: cab.id, cabName: cab.name, ownerName: cab.ownerName, ownerPhone: cab.phone,
       customerName: store.customerName, kind, vehicleType: cab.type, date, time, hours: Number(hours) || 1,
-      pickupArea, destination: kind === 'local' ? 'Local trip' : destination, km: kind === 'local' ? 0 : Number(km) || 0,
-      estimate: amountFor(cab), status: 'pending',
+      pickupArea, destination: kind === 'local' ? 'Local trip' : destination, km: 0,
+      estimate: amountFor(cab), perKmRate: cab.perKm, status: 'pending', requestKey: submissionKey,
     };
-    if (cloudUser) {
-      try {
-        await createCloudBooking({ customerId: cloudUser.id, customerName: store.customerName, cabId: cab.id, rideType: kind, vehicleType: cab.type, date, time, hours: Number(hours) || 1, pickupLocation: pickupArea, destination: item.destination, km: item.km, estimate: item.estimate });
-        await refreshCloud();
-      } catch (error) { Alert.alert(t('bookingFailed'), error instanceof Error ? error.message : String(error)); return; }
-    } else setStore((s) => ({ ...s, bookings: [item, ...s.bookings] }));
-    setSelectedCab(cab); setPage('bookings');
-    Alert.alert(t('bookingSent'), t('waitOwner'));
+    try {
+      if (cloudUser) {
+        const created = await createCloudBooking({ customerId: cloudUser.id, customerName: store.customerName, cabId: cab.id, rideType: kind, vehicleType: cab.type, date, time, hours: Number(hours) || 1, pickupLocation: pickupArea, destination: item.destination, km: item.km, estimate: item.estimate, requestKey: submissionKey });
+        item.id = created.id;
+        setStore((s) => ({ ...s, bookings: [item, ...s.bookings.filter((booking) => booking.id !== created.id)] }));
+      } else setStore((s) => ({ ...s, bookings: [item, ...s.bookings] }));
+      bookingRequestKey.current = null;
+      setSelectedCab(cab); setPage('bookings');
+      Alert.alert(t('requestConfirmed'), t('requestPending'));
+      if (cloudUser) refreshCloud().catch(() => undefined);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setSyncIssue(error instanceof TypeError || /network|fetch|offline|timeout/i.test(message));
+      Alert.alert(t('requestNotConfirmed'), message, [{ text: t('keepBooking'), style: 'cancel' }, { text: t('retryBooking'), onPress: () => { void createBooking(cab); } }]);
+    } finally {
+      bookingInFlight.current = false;
+      setBookingSubmitting(false);
+    }
   };
-  const reviewCab = (cab: Cab) => { setSelectedCab(cab); setPage('confirm'); };
-  const changeBooking = async (id: string, status: Booking['status']) => {
+  const reviewCab = (cab: Cab) => { bookingRequestKey.current = null; setSelectedCab(cab); setPage('confirm'); };
+  const changeBooking = async (id: string, status: BookingStatus, reason?: string) => {
     if (cloudUser && status !== 'pending') {
-      try { await setCloudBookingStatus(id, status); await refreshCloud(); }
+      try { await setCloudBookingStatus(id, status, reason); await refreshCloud(); }
       catch (error) { Alert.alert(t('updateFailed'), error instanceof Error ? error.message : String(error)); }
-    } else setStore((s) => ({ ...s, bookings: s.bookings.map((b) => b.id === id ? { ...b, status } : b) }));
+    } else setStore((s) => ({ ...s, bookings: s.bookings.map((b) => b.id === id ? { ...b, status, statusReason: reason ?? null } : b) }));
   };
   const addCab = async () => {
     if (!newName.trim()) { Alert.alert(t('enterVehicleName')); return; }
+    if (cloudUser && newRegistration.trim().replace(/[^a-z\d]/gi, '').length < 4) { Alert.alert(t('registrationRequired')); return; }
     const rates = [Number(newHourly), Number(newFullDay), Number(newPerKm), Number(newSeats)];
     if (rates.some((value) => !Number.isFinite(value) || value <= 0)) { Alert.alert(t('checkFaresSeats'), t('validFaresSeats')); return; }
-    const cab: Cab = { id: `cab-${Date.now()}`, ownerId: cloudUser?.id ?? 'owner-a', ownerName: profile?.full_name ?? 'Ramesh Kumar', phone: profile?.phone ?? '98765 43210', name: newName.trim(), type: newType, seats: Number(newSeats) || 4, available: true, hourly: Number(newHourly) || 0, fullDay: Number(newFullDay) || 0, perKm: Number(newPerKm) || 0 };
+    const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if ((newAvailabilityStart || newAvailabilityEnd) && (!timePattern.test(newAvailabilityStart) || !timePattern.test(newAvailabilityEnd) || newAvailabilityStart >= newAvailabilityEnd)) { Alert.alert(t('invalidAvailabilityHours')); return; }
+    const cab: Cab = { id: `cab-${Date.now()}`, ownerId: cloudUser?.id ?? 'owner-a', ownerName: profile?.full_name ?? 'Ramesh Kumar', phone: profile?.phone ?? '98765 43210', name: newName.trim(), type: newType, seats: Number(newSeats) || 4, available: !cloudUser, hourly: Number(newHourly) || 0, fullDay: Number(newFullDay) || 0, perKm: Number(newPerKm) || 0, registrationNumber: newRegistration.trim().toUpperCase(), reviewStatus: cloudUser ? 'pending' : 'approved', availabilityStart: newAvailabilityStart || null, availabilityEnd: newAvailabilityEnd || null };
     if (cloudUser) {
       try {
-        const details = { name: cab.name, type: cab.type, seats: cab.seats, hourly: cab.hourly, fullDay: cab.fullDay, perKm: cab.perKm };
+        const details = { name: cab.name, type: cab.type, seats: cab.seats, hourly: cab.hourly, fullDay: cab.fullDay, perKm: cab.perKm, registrationNumber: cab.registrationNumber ?? '', availabilityStart: cab.availabilityStart ?? null, availabilityEnd: cab.availabilityEnd ?? null };
         if (editingCabId) await editCloudVehicle(editingCabId, details);
         else await saveCloudVehicle({ ownerId: cloudUser.id, ...details });
         await refreshCloud();
@@ -187,15 +285,16 @@ export default function App() {
       catch (error) { Alert.alert(t('saveVehicleFailed'), error instanceof Error ? error.message : String(error)); return; }
     } else if (editingCabId) setStore((s) => ({ ...s, cabs: s.cabs.map((v) => v.id === editingCabId ? { ...cab, id: editingCabId } : v) }));
     else setStore((s) => ({ ...s, cabs: [...s.cabs, cab] }));
-    setNewName(''); setEditingCabId(null); setPage('owner');
+    setNewName(''); setNewRegistration(''); setNewAvailabilityStart(''); setNewAvailabilityEnd(''); setEditingCabId(null); setPage('owner');
   };
   const editCab = (cab: Cab) => {
     setEditingCabId(cab.id); setNewName(cab.name); setNewType(cab.type); setNewSeats(String(cab.seats));
-    setNewHourly(String(cab.hourly)); setNewFullDay(String(cab.fullDay)); setNewPerKm(String(cab.perKm)); setPage('add');
+    setNewHourly(String(cab.hourly)); setNewFullDay(String(cab.fullDay)); setNewPerKm(String(cab.perKm)); setNewRegistration(cab.registrationNumber ?? ''); setNewAvailabilityStart(cab.availabilityStart?.slice(0, 5) ?? ''); setNewAvailabilityEnd(cab.availabilityEnd?.slice(0, 5) ?? ''); setPage('add');
   };
   const toggleAvailability = async (cabId: string, available: boolean) => {
     if (cloudUser) {
-      try { await updateCloudAvailability(cabId, available); await refreshCloud(); }
+      const cab = store.cabs.find((item) => item.id === cabId);
+      try { await updateCloudAvailability(cabId, available, cab?.availabilityStart ?? null, cab?.availabilityEnd ?? null); await refreshCloud(); }
       catch (error) { Alert.alert(t('availabilityFailed'), error instanceof Error ? error.message : String(error)); }
     } else setStore((s) => ({ ...s, cabs: s.cabs.map((c) => c.id === cabId ? { ...c, available } : c) }));
   };
@@ -207,11 +306,19 @@ export default function App() {
     } else if (owner) setStore((s) => ({ ...s, blockedOwners: blocked ? s.blockedOwners.filter((x) => x !== accountId) : [...s.blockedOwners, accountId] }));
     else if (demoName) setStore((s) => ({ ...s, blockedCustomers: blocked ? s.blockedCustomers.filter((x) => x !== demoName) : [...s.blockedCustomers, demoName] }));
   };
-  const toggleAdminVehicle = async (cab: Cab, available: boolean) => {
+  const toggleAdminVehicle = async (cab: Cab, blocked: boolean) => {
     if (cloudUser) {
-      try { await setCloudVehicleAvailability(cab.id, available); await refreshCloud(); }
+      try { await setCloudVehicleBlocked(cab.id, blocked); await refreshCloud(); }
       catch (error) { Alert.alert(t('updateFailed'), error instanceof Error ? error.message : String(error)); }
-    } else setStore((s) => ({ ...s, blockedVehicles: available ? s.blockedVehicles.filter((x) => x !== cab.id) : [...s.blockedVehicles, cab.id] }));
+    } else setStore((s) => ({ ...s, blockedVehicles: blocked ? [...s.blockedVehicles, cab.id] : s.blockedVehicles.filter((x) => x !== cab.id) }));
+  };
+  const reviewOwner = async (accountId: string, status: ReviewStatus) => {
+    try { await setCloudOwnerReviewStatus(accountId, status); await refreshCloud(); }
+    catch (error) { Alert.alert(t('updateFailed'), error instanceof Error ? error.message : String(error)); }
+  };
+  const reviewVehicle = async (cab: Cab, status: ReviewStatus) => {
+    try { await setCloudVehicleReviewStatus(cab.id, status); await refreshCloud(); }
+    catch (error) { Alert.alert(t('updateFailed'), error instanceof Error ? error.message : String(error)); }
   };
   const submitAuth = async () => {
     if (!supabase) { Alert.alert(t('backendMissing'), t('backendSetup')); return; }
@@ -235,7 +342,14 @@ export default function App() {
     }
   };
 
-  const header = (title: string, back?: () => void) => <AppHeader title={title} back={back} signedIn={Boolean(cloudUser)} hindi={hindi} onSignOut={() => supabase?.auth.signOut()} onToggleLanguage={() => setHindi(!hindi)} t={t} />;
+  const signOut = async () => {
+    if (cloudUser && pushToken.current) {
+      await removeCloudPushToken(cloudUser.id, pushToken.current).catch(() => undefined);
+      pushToken.current = null;
+    }
+    await supabase?.auth.signOut();
+  };
+  const header = (title: string, back?: () => void) => <AppHeader title={title} back={back} signedIn={Boolean(cloudUser)} hindi={hindi} onSignOut={signOut} onToggleLanguage={() => setHindi(!hindi)} t={t} />;
   const rolePicker = () => demoMode && !cloudUser ? <RolePicker role={role} t={t} onPick={(value) => { setRole(value); setPage(value === 'customer' ? 'home' : value === 'owner' ? 'owner' : 'admin'); }} /> : null;
   const field = (label: string, value: string, onChange: (text: string) => void, placeholder = '', keyboardType: 'default' | 'numeric' = 'default', secureTextEntry = false) => <FormField label={label} value={value} onChange={onChange} placeholder={placeholder} keyboardType={keyboardType === 'numeric' ? 'numeric' : 'default'} secureTextEntry={secureTextEntry} />;
   const primary = (label: string, onPress: () => void) => <PrimaryButton label={label} onPress={onPress} />;
@@ -258,21 +372,21 @@ export default function App() {
   } else if (page === 'home') {
     content = <>{header(t('customer'))}<CustomerHomeContent t={t} hindi={hindi} kind={kind} localFrom={localFrom} outstationFrom={outstationFrom} availableCabCount={cabsOpenForSearch.length} setKind={setKind} pickupArea={pickupArea} setPickupArea={setPickupArea} onSearch={() => setPage('search')} rolePicker={rolePicker()} />{bottomNav('home')}</>;
   } else if (page === 'search') {
-    content = <>{header(t('tripDetails'), () => setPage('home'))}<CustomerSearchContent t={t} hindi={hindi} kind={kind} pickupArea={pickupArea} setPickupArea={setPickupArea} vehicleType={vehicleType} setVehicleType={setVehicleType} date={date} setDate={setDate} time={time} setTime={setTime} hours={hours} setHours={setHours} destination={destination} setDestination={setDestination} km={km} setKm={setKm} onSearch={openResults} />{bottomNav('home')}</>;
+    content = <>{header(t('tripDetails'), () => setPage('home'))}<CustomerSearchContent t={t} hindi={hindi} kind={kind} pickupArea={pickupArea} setPickupArea={setPickupArea} vehicleType={vehicleType} setVehicleType={setVehicleType} date={date} setDate={setDate} time={time} setTime={setTime} hours={hours} setHours={setHours} destination={destination} setDestination={setDestination} onSearch={openResults} />{bottomNav('home')}</>;
   } else if (page === 'results') {
-    content = <>{header(t('nearby'), () => setPage('search'))}<SearchResultsContent hindi={hindi} t={t} kind={kind} vehicleType={vehicleType} pickupArea={pickupArea} date={date} time={time} hours={hours} destination={destination} km={km} results={results} onSelectCab={reviewCab} rolePicker={rolePicker()} />{bottomNav('results')}</>;
+    content = <>{header(t('nearby'), () => setPage('search'))}<SearchResultsContent hindi={hindi} t={t} kind={kind} vehicleType={vehicleType} pickupArea={pickupArea} date={date} time={time} hours={hours} destination={destination} results={results} onSelectCab={reviewCab} onAnyVehicle={() => setVehicleType('Any')} onChangeSearch={() => setPage('search')} rolePicker={rolePicker()} />{bottomNav('results')}</>;
   } else if (page === 'confirm' && selectedCab) {
-    content = <>{header(t('reviewBooking'), () => setPage('results'))}<ScrollView contentContainerStyle={styles.content}><BookingConfirmation cab={selectedCab} kind={kind} date={date} time={time} hours={Number(hours) || 1} pickupArea={pickupArea} destination={destination} km={Number(km) || 0} estimate={amountFor(selectedCab)} hindi={hindi} t={t} onSend={() => { void createBooking(selectedCab); }} onChangeDetails={() => setPage('search')} /></ScrollView></>;
+    content = <>{header(t('reviewBooking'), () => setPage('results'))}<ScrollView contentContainerStyle={styles.content}><BookingConfirmation cab={selectedCab} kind={kind} date={date} time={time} hours={Number(hours) || 1} pickupArea={pickupArea} destination={destination} estimate={amountFor(selectedCab)} hindi={hindi} t={t} submitting={bookingSubmitting} onSend={() => { void createBooking(selectedCab); }} onChangeDetails={() => { bookingRequestKey.current = null; setPage('search'); }} /></ScrollView></>;
   } else if (page === 'bookings') {
     content = <>{header(t('bookings'), () => setPage('home'))}<CustomerBookingsContent bookings={store.bookings} hindi={hindi} t={t} onChangeStatus={changeBooking} onSearch={() => setPage('search')} rolePicker={rolePicker()} />{bottomNav('bookings')}</>;
   } else if (page === 'owner') {
     const owned = store.cabs.filter((cab) => cab.ownerId === (cloudUser?.id ?? 'owner-a'));
     const ownBookings = store.bookings.filter((booking) => owned.some((cab) => cab.id === booking.cabId));
-    content = <>{header(t('ownerPanel'))}<OwnerDashboardContent owned={owned} bookings={ownBookings} ownerName={profile?.full_name ?? ''} hindi={hindi} t={t} rolePicker={rolePicker()} onAddVehicle={() => setPage('add')} onEditVehicle={editCab} onToggleAvailability={toggleAvailability} onChangeStatus={changeBooking} />{bottomNav('owner')}</>;
+    content = <>{header(t('ownerPanel'))}<OwnerDashboardContent owned={owned} bookings={ownBookings} ownerName={profile?.full_name ?? ''} ownerReviewStatus={demoMode ? 'approved' : profile?.owner_review_status} pushState={demoMode ? 'unsupported' : pushState} focusBookingId={focusBookingId} onEnablePush={() => cloudUser && void enablePush(cloudUser.id)} hindi={hindi} t={t} rolePicker={rolePicker()} onAddVehicle={() => setPage('add')} onEditVehicle={editCab} onToggleAvailability={toggleAvailability} onChangeStatus={changeBooking} />{bottomNav('owner')}</>;
   } else if (page === 'add') {
-    content = <>{header(editingCabId ? t('editVehicle') : t('addVehicle'), () => { setEditingCabId(null); setNewName(''); setPage('owner'); })}<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}><VehicleFormContent hindi={hindi} t={t} newName={newName} setNewName={setNewName} newType={newType} setNewType={setNewType} newSeats={newSeats} setNewSeats={setNewSeats} newHourly={newHourly} setNewHourly={setNewHourly} newFullDay={newFullDay} setNewFullDay={setNewFullDay} newPerKm={newPerKm} setNewPerKm={setNewPerKm} onSave={addCab} /></KeyboardAvoidingView></>;
+    content = <>{header(editingCabId ? t('editVehicle') : t('addVehicle'), () => { setEditingCabId(null); setNewName(''); setPage('owner'); })}<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}><VehicleFormContent hindi={hindi} t={t} newName={newName} setNewName={setNewName} newType={newType} setNewType={setNewType} newSeats={newSeats} setNewSeats={setNewSeats} newHourly={newHourly} setNewHourly={setNewHourly} newFullDay={newFullDay} setNewFullDay={setNewFullDay} newPerKm={newPerKm} setNewPerKm={setNewPerKm} registrationNumber={newRegistration} setRegistrationNumber={setNewRegistration} availabilityStart={newAvailabilityStart} setAvailabilityStart={setNewAvailabilityStart} availabilityEnd={newAvailabilityEnd} setAvailabilityEnd={setNewAvailabilityEnd} onSave={addCab} /></KeyboardAvoidingView></>;
   } else {
-    content = <>{header(t('dashboard'))}<AdminScreen store={store} live={Boolean(cloudUser)} hindi={hindi} t={t} rolePicker={rolePicker()} onToggleAccount={toggleAdminAccount} onToggleVehicle={toggleAdminVehicle} onChangeStatus={changeBooking} />{bottomNav('admin')}</>;
+    content = <>{header(t('dashboard'))}<AdminScreen store={store} live={Boolean(cloudUser)} hindi={hindi} t={t} rolePicker={rolePicker()} onToggleAccount={toggleAdminAccount} onToggleVehicle={toggleAdminVehicle} onReviewOwner={reviewOwner} onReviewVehicle={reviewVehicle} onChangeStatus={changeBooking} />{bottomNav('admin')}</>;
   }
 
   function bottomNav(active: 'home' | 'results' | 'bookings' | 'owner' | 'admin') {
@@ -280,5 +394,5 @@ export default function App() {
   }
 
   const androidTopInset = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 8 : 0;
-  return <SafeAreaView style={[styles.safe, { paddingTop: androidTopInset }]}><StatusBar barStyle="dark-content" backgroundColor={C.bg} />{cloudLoading && cloudUser ? <View style={styles.loading}><Text style={styles.logoMark}>MS</Text><Text style={styles.headerTitle}>{t('loadingRides')}</Text></View> : ready ? content : <View style={styles.loading}><Text style={styles.logoMark}>MS</Text><Text style={styles.headerTitle}>{t('brand')}</Text></View>}</SafeAreaView>;
+  return <SafeAreaView style={[styles.safe, { paddingTop: androidTopInset }]}><StatusBar barStyle="dark-content" backgroundColor={C.bg} />{cloudLoading && cloudUser ? <View style={styles.loading}><Text style={styles.logoMark}>MS</Text><Text style={styles.headerTitle}>{t('loadingRides')}</Text></View> : ready ? <View style={{ flex: 1 }}>{syncIssue && cloudUser && <Pressable accessibilityRole="button" onPress={() => refreshCloud().catch(() => undefined)} style={[styles.summaryPanel, { margin: 8, borderColor: C.red, borderWidth: 1 }]}><Text style={styles.summaryTitle}>{t('retryLoad')}</Text><Text style={styles.confirmationEditText}>{t('retryBooking')}</Text></Pressable>}{content}</View> : <View style={styles.loading}><Text style={styles.logoMark}>MS</Text><Text style={styles.headerTitle}>{t('brand')}</Text></View>}</SafeAreaView>;
 }

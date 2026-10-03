@@ -16,6 +16,42 @@ have to re-derive it from scratch by reading git history.
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-02 — send owner booking alerts through Expo Push Service
+
+**Decision:** Register owner Expo tokens in Supabase and dispatch generic booking-request notifications from a Supabase Edge Function triggered by a database INSERT webhook. Require a shared webhook secret, recheck owner/vehicle approval before delivery, and include only the booking UUID in notification data.
+**Why:** Expo Push Service plus Android FCM V1 fits the low-cost Android pilot, and server-side dispatch keeps service credentials out of the app. Notification delivery is best effort and must not control booking state.
+**Rejected:** Sending directly from the app, because clients cannot safely hold server credentials; SMS, because the user explicitly wants no SMS cost; including trip/contact details, because the notification tray can be visible on a locked phone.
+
+### 2026-10-02 — fail closed on owner and vehicle review
+
+**Decision:** New and existing owners/vehicles start pending; only approved owners and individually approved, unblocked vehicles may be listed or booked. A changed registration number resets an approved vehicle to pending and unavailable.
+**Why:** UI-only gating is bypassable through the Supabase API, and pre-review listings cannot be trusted implicitly. Manual registration review keeps the one-town pilot low cost.
+**Rejected:** Approving legacy listings automatically, because that would preserve the unsafe path the review flow is intended to close; adding document uploads now, because no storage bucket or review process is configured.
+
+### 2026-10-02 — expire requests lazily and preserve slot correctness
+
+**Decision:** Pending requests expire after 15 minutes. App refresh marks them expired; the slot trigger ignores stale pending rows even if no client or scheduled job has run. A Supabase Cron call is optional for timely status display while all clients are idle.
+**Why:** The slot invariant must not depend on push delivery or a paid background service. Lazy expiry keeps the pilot's operating cost low and does not leave a cab blocked after a lost request.
+**Rejected:** Relying only on the app timer, because an app may be closed; requiring Cron for correctness, because projects may not have it configured.
+
+### 2026-10-02 — quote outstation trips by saved rate only
+
+**Decision:** Keep the driver's one-way ₹/km rate visible, remove customer-estimated kilometres and show no outstation total. Snapshot the saved per-km rate on the booking and state that final distance/fare is agreed with the driver.
+**Why:** The app has no trusted route/distance source and a guessed total would mislead customers.
+**Rejected:** Multiplying the driver's rate by an unverified distance entered by the customer.
+
+### 2026-10-02 — keep pilot analytics event-only and PII-free
+
+**Decision:** Store event name, timestamp, and optional booking UUID only; expose weekly aggregates to admins through a database function.
+**Why:** The first pilot needs a funnel signal but not names, phone numbers, destinations, fares, or coordinates in analytics.
+**Rejected:** A third-party analytics SDK before the single-town funnel and privacy needs are validated.
+
+### 2026-10-01 — use the system dialer for accepted booking contact
+
+**Decision:** After a booking is accepted, show a tap-to-call action for the other party using Android's `tel:` link. Keep the contact number hidden until acceptance and open the dialer rather than requesting direct-call permission.
+**Why:** Calling is in the MVP journey, the secure contact RPC already releases each phone number only to the two parties after acceptance, and the system dialer keeps the app simple without adding phone permissions.
+**Rejected:** In-app calling or `CALL_PHONE` permission, because neither is required to connect customer and driver for this pilot.
+
 ### 2026-10-01 — use text search and foreground location for pickup
 
 **Decision:** Keep pickup selection map-free. Use Expo Location only after the user taps “Use my location,” and use Photon suggestions after a short typing pause. Keep manual address entry available and require a pickup value before cab search.

@@ -12,10 +12,10 @@ export function BookingConfirmation({
   hours,
   pickupArea,
   destination,
-  km,
   estimate,
   hindi,
   t,
+  submitting,
   onSend,
   onChangeDetails,
 }: {
@@ -26,10 +26,10 @@ export function BookingConfirmation({
   hours: number;
   pickupArea: string;
   destination: string;
-  km: number;
   estimate: number;
   hindi: boolean;
   t: (key: string) => string;
+  submitting: boolean;
   onSend: () => void;
   onChangeDetails: () => void;
 }) {
@@ -48,10 +48,10 @@ export function BookingConfirmation({
         <Text style={styles.confirmationLabel}>{t('trip')}</Text>
         <Text style={styles.confirmationValue}>{kind === 'local'
           ? `${t('localShort')} · ${hours} ${t('hoursUnit')}`
-          : `${t('outstationShort')} · ${destination} · ${km} ${t('kmUnit')} ${t('oneWay')}`}</Text>
-        <View style={styles.confirmationFare}><View style={{ flex: 1 }}><Text style={styles.confirmationFareLabel}>{t('estimatedFare')}</Text><Text style={styles.confirmationMeta}>{t('driverConfirmsFare')}</Text></View><Text style={styles.confirmationPrice}>{formatRs(estimate)}</Text></View>
+          : `${t('outstationShort')} · ${destination} · ${t('perKmRate')} ${formatRs(cab.perKm)}${t('perKmUnit')}`}</Text>
+        <View style={styles.confirmationFare}><View style={{ flex: 1 }}><Text style={styles.confirmationFareLabel}>{kind === 'local' ? t('estimatedFare') : t('outstationFare')}</Text><Text style={styles.confirmationMeta}>{t(kind === 'local' ? 'estimateNote' : 'driverConfirmsFare')}</Text></View>{kind === 'local' && <Text style={styles.confirmationPrice}>{formatRs(estimate)}</Text>}</View>
       </View>
-      <Pressable accessibilityRole="button" onPress={onSend} style={styles.primary}><Text style={styles.primaryText}>{t('sendBooking')}  →</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={submitting} onPress={onSend} style={[styles.primary, submitting && { opacity: 0.55 }]}><Text style={styles.primaryText}>{submitting ? t('loadingRides') : t('sendBooking')}  →</Text></Pressable>
       <Pressable accessibilityRole="button" onPress={onChangeDetails} style={styles.confirmationEdit}><Text style={styles.confirmationEditText}>{t('changeDetails')}</Text></Pressable>
     </View>
   );

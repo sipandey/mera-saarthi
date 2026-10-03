@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import type { BookingStatus, PilotMetric, ReviewStatus } from './types';
 
 export type CloudRole = 'customer' | 'owner' | 'admin';
 
@@ -12,11 +13,13 @@ export async function loadCloudData(userId: string, role: CloudRole, profileName
   const carsQuery = role === 'customer'
     ? supabase.from('available_vehicles').select('*')
     : supabase.from('vehicles').select('*').order('created_at', { ascending: false });
+  const expiryResult = await supabase.rpc('expire_stale_bookings');
+  fail(expiryResult.error);
   const bookingsQuery = supabase.from('bookings').select('*').order('pickup_at', { ascending: true });
   const [carsResult, bookingsResult, profilesResult] = await Promise.all([
     carsQuery,
     bookingsQuery,
-    role === 'admin' ? supabase.from('profiles').select('id, role, full_name, phone, is_blocked, created_at') : Promise.resolve({ data: [], error: null }),
+    role === 'admin' ? supabase.from('profiles').select('id, role, full_name, phone, is_blocked, owner_review_status, created_at') : Promise.resolve({ data: [], error: null }),
   ]);
   fail(carsResult.error); fail(bookingsResult.error); fail(profilesResult.error);
   const profiles = (profilesResult.data ?? []) as any[];
@@ -28,7 +31,10 @@ export async function loadCloudData(userId: string, role: CloudRole, profileName
       phone: asText(owner?.phone) || (v.owner_id === userId ? profilePhone : ''),
       name: v.name, type: v.vehicle_type, seats: v.seats, available: v.is_available,
       hourly: Number(v.hourly_rate), fullDay: Number(v.full_day_rate), perKm: Number(v.per_km_rate),
-      blocked: Boolean(owner?.is_blocked),
+      blocked: Boolean(v.is_blocked),
+      registrationNumber: v.registration_number ?? '', reviewStatus: v.review_status ?? 'approved',
+      availabilityStart: v.availability_start ?? null, availabilityEnd: v.availability_end ?? null,
+      availabilityUpdatedAt: v.availability_updated_at ?? '',
     };
   });
   const cabById = new Map(cabs.map((c) => [c.id, c]));
@@ -49,15 +55,22 @@ export async function loadCloudData(userId: string, role: CloudRole, profileName
       customerName: asText(b.customer_name) || 'Customer', customerPhone: role === 'owner' ? asText(driver?.phone) : asText(profileById.get(b.customer_id)?.phone),
       kind: b.ride_type, vehicleType: b.vehicle_type, date: localDate(rideAt),
       time: localTime(rideAt), hours: Number(b.duration_hours), pickupArea: asText(b.pickup_location), destination: b.destination,
-      km: Number(b.estimated_km), estimate: Number(b.estimated_fare), status: b.status,
+      km: Number(b.estimated_km), estimate: Number(b.estimated_fare), perKmRate: Number(b.per_km_rate_snapshot ?? cab?.perKm ?? 0),
+      status: b.status, statusReason: b.status_reason ?? null, requestKey: b.request_key,
     };
   }));
-  return { cabs, bookings, profiles };
+  let metrics: PilotMetric[] = [];
+  if (role === 'admin') {
+    const result = await supabase.rpc('get_weekly_pilot_metrics');
+    fail(result.error);
+    metrics = ((result.data ?? []) as any[]).map((row) => ({ ...row, event_count: Number(row.event_count) }));
+  }
+  return { cabs, bookings, profiles, metrics };
 }
 
 export async function createCloudBooking(input: {
   customerId: string; customerName: string; cabId: string; rideType: 'local' | 'outstation';
-  vehicleType: string; date: string; time: string; hours: number; pickupLocation: string; destination: string; km: number; estimate: number;
+  vehicleType: string; date: string; time: string; hours: number; pickupLocation: string; destination: string; km: number; estimate: number; requestKey: string;
 }) {
   if (!supabase) throw new Error('Supabase is not configured.');
   const pickupAt = new Date(`${input.date}T${input.time}:00`);
@@ -66,49 +79,96 @@ export async function createCloudBooking(input: {
     customer_id: input.customerId, vehicle_id: input.cabId, ride_type: input.rideType,
     vehicle_type: input.vehicleType, pickup_at: pickupAt.toISOString(), duration_hours: input.hours,
     pickup_location: input.pickupLocation, destination: input.destination, estimated_km: input.km, estimated_fare: input.estimate,
-    payment_method: 'cash', status: 'pending', customer_name: input.customerName,
+    payment_method: 'cash', status: 'pending', customer_name: input.customerName, request_key: input.requestKey,
   }).select('id').single();
+  if (error?.code === '23505') {
+    const retry = await supabase.from('bookings').select('id').eq('request_key', input.requestKey).single();
+    fail(retry.error);
+    if (!retry.data) throw new Error('The server could not find the earlier booking request.');
+    return retry.data;
+  }
   fail(error);
+  if (!data) throw new Error('The server did not confirm this booking.');
   return data;
 }
 
-export async function setCloudBookingStatus(id: string, status: 'accepted' | 'rejected' | 'cancelled') {
+export async function setCloudBookingStatus(id: string, status: BookingStatus, reason?: string) {
   if (!supabase) throw new Error('Supabase is not configured.');
-  const { error } = await supabase.from('bookings').update({ status }).eq('id', id);
+  const { error } = await supabase.from('bookings').update({ status, status_reason: reason ?? null }).eq('id', id).select('id').single();
   fail(error);
 }
 
 export async function saveCloudVehicle(input: {
-  ownerId: string; name: string; type: string; seats: number; hourly: number; fullDay: number; perKm: number;
+  ownerId: string; name: string; type: string; seats: number; hourly: number; fullDay: number; perKm: number; registrationNumber: string; availabilityStart: string | null; availabilityEnd: string | null;
 }) {
   if (!supabase) throw new Error('Supabase is not configured.');
   const { error } = await supabase.from('vehicles').insert({
     owner_id: input.ownerId, name: input.name, vehicle_type: input.type, seats: input.seats,
-    hourly_rate: input.hourly, full_day_rate: input.fullDay, per_km_rate: input.perKm, is_available: true,
+    hourly_rate: input.hourly, full_day_rate: input.fullDay, per_km_rate: input.perKm,
+    registration_number: input.registrationNumber, availability_start: input.availabilityStart, availability_end: input.availabilityEnd,
+    is_available: false, review_status: 'pending',
   });
   fail(error);
 }
 
 export async function editCloudVehicle(id: string, input: {
-  name: string; type: string; seats: number; hourly: number; fullDay: number; perKm: number;
+  name: string; type: string; seats: number; hourly: number; fullDay: number; perKm: number; registrationNumber: string; availabilityStart: string | null; availabilityEnd: string | null;
 }) {
   if (!supabase) throw new Error('Supabase is not configured.');
   const { error } = await supabase.from('vehicles').update({
     name: input.name, vehicle_type: input.type, seats: input.seats,
     hourly_rate: input.hourly, full_day_rate: input.fullDay, per_km_rate: input.perKm,
+    registration_number: input.registrationNumber,
+    availability_start: input.availabilityStart, availability_end: input.availabilityEnd,
   }).eq('id', id);
   fail(error);
 }
 
-export async function updateCloudAvailability(id: string, available: boolean) {
+export async function updateCloudAvailability(id: string, available: boolean, start: string | null, end: string | null) {
   if (!supabase) throw new Error('Supabase is not configured.');
-  const { error } = await supabase.from('vehicles').update({ is_available: available }).eq('id', id);
+  const { error } = await supabase.from('vehicles').update({ is_available: available, availability_start: start, availability_end: end }).eq('id', id);
   fail(error);
 }
 
 export async function setCloudAccountBlocked(id: string, blocked: boolean) {
   if (!supabase) throw new Error('Supabase is not configured.');
   const { error } = await supabase.from('profiles').update({ is_blocked: blocked }).eq('id', id);
+  fail(error);
+}
+
+export async function setCloudOwnerReviewStatus(id: string, status: ReviewStatus) {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { error } = await supabase.from('profiles').update({ owner_review_status: status }).eq('id', id);
+  fail(error);
+}
+
+export async function setCloudVehicleReviewStatus(id: string, status: ReviewStatus) {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { error } = await supabase.from('vehicles').update({ review_status: status, is_available: false }).eq('id', id);
+  fail(error);
+}
+
+export async function setCloudVehicleBlocked(id: string, blocked: boolean) {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { error } = await supabase.from('vehicles').update({ is_blocked: blocked }).eq('id', id).select('id').single();
+  fail(error);
+}
+
+export async function trackPilotEvent(eventName: 'search' | 'results_view', bookingId?: string) {
+  if (!supabase) return;
+  const { error } = await supabase.rpc('record_pilot_event', { p_event_name: eventName, p_booking_id: bookingId ?? null });
+  fail(error);
+}
+
+export async function saveCloudPushToken(ownerId: string, token: string) {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { error } = await supabase.from('push_tokens').upsert({ owner_id: ownerId, expo_push_token: token, updated_at: new Date().toISOString() }, { onConflict: 'expo_push_token' });
+  fail(error);
+}
+
+export async function removeCloudPushToken(ownerId: string, token: string) {
+  if (!supabase) return;
+  const { error } = await supabase.from('push_tokens').delete().eq('owner_id', ownerId).eq('expo_push_token', token);
   fail(error);
 }
 

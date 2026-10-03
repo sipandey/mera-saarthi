@@ -8,7 +8,6 @@ export function CabCard({
   cab,
   kind,
   hours,
-  km,
   hindi,
   t,
   onBook,
@@ -16,14 +15,11 @@ export function CabCard({
   cab: Cab;
   kind: Hire;
   hours: string;
-  km: string;
   hindi: boolean;
   t: (key: string) => string;
   onBook: () => void;
 }) {
-  const fare = kind === 'local'
-    ? (Number(hours) >= 8 ? cab.fullDay : cab.hourly * Math.max(1, Number(hours) || 1))
-    : cab.perKm * (Number(km) || 0);
+  const fare = Number(hours) >= 8 ? cab.fullDay : cab.hourly * Math.max(1, Number(hours) || 1);
 
   return (
     <View style={styles.cabCard}>
@@ -39,7 +35,7 @@ export function CabCard({
       </View>
       <View style={styles.cardBottom}>
         <View style={{ flex: 1, paddingRight: 10 }}>
-          <Text style={styles.secondaryRate}>{t('quote')}: {formatRs(fare)}{kind === 'local' ? ` · ${formatRs(cab.fullDay)} ${t('fullDay')}` : ` · ${km} ${t('kmUnit')} ${t('oneWay')}`}</Text>
+          <Text style={styles.secondaryRate}>{kind === 'local' ? `${t('quote')}: ${formatRs(fare)} · ${formatRs(cab.fullDay)} ${t('fullDay')}` : t('outstationFare')}</Text>
           <Text style={styles.cashLine}>● {t('cash')}</Text>
         </View>
         <Pressable accessibilityRole="button" onPress={onBook} style={styles.bookSmall}><Text style={styles.bookSmallText}>{t('select')}</Text></Pressable>

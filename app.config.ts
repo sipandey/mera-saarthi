@@ -12,10 +12,14 @@ const config: ExpoConfig = {
     versionCode: 1,
     adaptiveIcon: { backgroundColor: '#F2F7F3' },
   },
-  plugins: [['expo-location', { locationWhenInUsePermission: 'Use your location to set the pickup place.' }]],
+  plugins: [
+    ['expo-location', { locationWhenInUsePermission: 'Use your location to set the pickup place.' }],
+    ['expo-notifications', { color: '#15803D', defaultChannel: 'booking-requests' }],
+  ],
   extra: {
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '',
+    eas: { projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? '' },
   },
 };
 
