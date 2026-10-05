@@ -12,7 +12,7 @@
 | Results and quote | Only eligible available cabs; local hourly/full-day quote; outstation saved one-way ₹/km rate, with final fare agreed directly; rate sort; no-results recovery; optional driver and vehicle photos | `src/components/CabCard.tsx`, `src/screens/CustomerScreens.tsx`, `App.tsx` |
 | Booking | Review screen, cash explanation, idempotent request attempt, server-confirmed success, booking status card, cancellation/rejection reasons, contact after acceptance via system dialer | `src/components/BookingConfirmation.tsx`, `src/components/BookingCard.tsx`, `App.tsx`, `src/cloudData.ts` |
 | Owner dashboard | Driver evidence checklist, opt-in selfie display switch, vehicle cards, required RC/insurance/PUC uploads, optional vehicle-photo upload and withdrawal, expiry fields, approval/availability state, rates/hours, booking actions, optional Android push setup | `src/screens/OwnerScreens.tsx`, `src/components/BookingCard.tsx`, `src/pushNotifications.ts`, `App.tsx` |
-| Admin dashboard | Review queue with file open/approve/reject, owner/vehicle approve/reject gates, block/unblock, booking list/status actions, weekly counts in cloud mode; equivalent state-changing actions in demo | `src/screens/AdminScreen.tsx`, `App.tsx` |
+| Admin dashboard | Review queue with file open/approve/reject, owner/vehicle approve/reject gates, block/unblock, booking status/reason and ordered history timeline, weekly counts in cloud mode; equivalent booking-history updates in demo | `src/screens/AdminScreen.tsx`, `App.tsx` |
 | Language and common UI | Hindi/English switch; common mobile components/theme | `src/i18n.ts`, `src/theme.ts`, `src/components/*` |
 
 ## Core booking and approval invariants
@@ -96,7 +96,7 @@ For a fresh database, use the tracked base schema and five migrations in a dispo
 | Suresh Yadav / Mahindra Bolero | Missing/pending/rejected driver/vehicle evidence; rejected selfie reason; pending optional vehicle photo; disabled approval until required evidence is ready | Camera/file selection, actual private file preview, live server gates |
 | Amit Patel / Maruti Dzire | Approved driver but rejected insurance; vehicle approval stays incomplete | SQL trigger/RLS enforcement against API bypass |
 | Meena Devi / Tata Tigor | Expired insurance makes otherwise reviewed supply ineligible | Date/time behavior across real Android timezone settings |
-| Demo owner/admin loop | Submit synthetic replacement, review/approve/reject locally, test driver-photo opt-in, remove an optional vehicle photo, and verify the photo remains non-gating | Supabase auth, migrations, signed URLs, retention worker schedule, push, external geocoder uptime |
+| Demo owner/admin loop | Submit synthetic replacement, review/approve/reject locally, test driver-photo opt-in, remove an optional vehicle photo, verify the photo remains non-gating, and inspect booking transition history after a demo lifecycle | Supabase auth, migrations, signed URLs, retention worker schedule, push, external geocoder uptime |
 
 Demo file paths are synthetic. The photo preview is a placeholder, not a real photograph. Real camera and document selection are cloud-only. Treat demo as a workflow/presentation fixture, not as an integration test.
 

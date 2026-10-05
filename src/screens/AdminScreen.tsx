@@ -4,7 +4,7 @@ import { BookingCard } from '../components/BookingCard';
 import { styles } from '../theme';
 import { todayInIndia } from '../utils';
 import { isLatestVerificationDocument, requiredVerificationDocumentsApproved } from '../verification';
-import type { Account, Booking, BookingStatus, Cab, DocumentType, ReviewStatus, Store, VerificationDocument } from '../types';
+import type { Account, Booking, BookingStatus, BookingStatusHistoryEntry, Cab, DocumentType, ReviewStatus, Store, VerificationDocument } from '../types';
 
 type Translate = (key: string) => string;
 
@@ -73,7 +73,21 @@ export function AdminScreen({
       <Text style={styles.sectionTitle}>{t('vehicles')} · {store.cabs.length}</Text>
       {store.cabs.map((cab) => { const blocked = live ? Boolean(cab.blocked) : store.blockedVehicles.includes(cab.id); const ownerApproved = store.profiles.find((item) => item.id === cab.ownerId)?.owner_review_status === 'approved'; const vehicleDocsReady = requiredDocsApproved(store.documents ?? [], cab.ownerId, cab.id, ['registration', 'insurance', 'pollution'], cab.registrationUpdatedAt); return <View key={cab.id} style={styles.adminRow}><View style={{ flex: 1 }}><Text style={styles.cabName}>{cab.name}</Text><Text style={styles.cabMeta}>{cab.ownerName} · {t(`vehicle${cab.type}`)} · {cab.seats} {t('seats')}</Text><Text style={styles.cabMeta}>{t('vehicleRegistration')}: {cab.registrationNumber || '—'} · {t(cab.reviewStatus ?? 'pending')} · {vehicleDocsReady ? t('documentsComplete') : t('documentsIncomplete')}</Text></View>{cab.reviewStatus !== 'approved' && <Pressable accessibilityRole="button" disabled={!ownerApproved || !vehicleDocsReady} onPress={() => onReviewVehicle(cab, 'approved')} style={[styles.adminAction, (!ownerApproved || !vehicleDocsReady) && styles.adminActionOff]}><Text style={styles.adminActionText}>{!ownerApproved ? t('approveOwnerFirst') : vehicleDocsReady ? t('approve') : t('documentsRequired')}</Text></Pressable>}{(cab.reviewStatus === 'approved' || cab.reviewStatus === 'pending') && <Pressable accessibilityRole="button" onPress={() => onReviewVehicle(cab, 'rejected')} style={styles.adminAction}><Text style={styles.adminActionText}>{t('reject')}</Text></Pressable>}<Pressable accessibilityRole="button" onPress={() => onToggleVehicle(cab, !blocked)} style={[styles.adminAction, blocked && styles.adminActionOff]}><Text style={styles.adminActionText}>{blocked ? t('unblock') : t('block')}</Text></Pressable></View>; })}
       <Text style={styles.sectionTitle}>{t('allBookings')} · {store.bookings.length}</Text>
-      {store.bookings.length ? store.bookings.map((booking) => <BookingCard key={booking.id} booking={booking} hindi={hindi} t={t} onChangeStatus={onChangeStatus} />) : <Text style={styles.emptyText}>{t('noBooking')}</Text>}
+      {store.bookings.length ? store.bookings.map((booking) => {
+        const history = (store.bookingHistory ?? [])
+          .filter((entry) => entry.bookingId === booking.id)
+          .sort((a, b) => Date.parse(b.changedAt) - Date.parse(a.changedAt))
+          .slice(0, 10);
+        return <View key={booking.id} style={{ gap: 8 }}>
+          <BookingCard booking={booking} hindi={hindi} t={t} onChangeStatus={onChangeStatus} />
+          <View style={styles.adminEvidenceCard}>
+            <Text style={styles.cabMeta}>{t('statusHistory')}</Text>
+            {history.length ? history.map((entry) => <Text key={entry.id} style={styles.bookingHelper}>
+              {formatHistoryTime(entry.changedAt, hindi)} · {entry.fromStatus ? t(entry.fromStatus) : t('bookingCreated')} → {t(entry.toStatus)} · {entry.actorId ? store.profiles.find((profile) => profile.id === entry.actorId)?.full_name ?? t('unknownActor') : t('systemActor')}{entry.reason ? ` · ${t(formatHistoryReason(entry.reason))}` : ''}
+            </Text>) : <Text style={styles.bookingHelper}>{t('noStatusHistory')}</Text>}
+          </View>
+        </View>;
+      }) : <Text style={styles.emptyText}>{t('noBooking')}</Text>}
       {live && <><Text style={styles.sectionTitle}>{t('pilotMetrics')}</Text>{store.metrics?.length ? store.metrics.slice(0, 30).map((metric) => <View key={`${metric.week_start}-${metric.event_name}`} style={styles.adminRow}><Text style={[styles.cabMeta, { flex: 1 }]}>{metric.week_start} · {t(metric.event_name === 'search' ? 'searches' : metric.event_name)}</Text><Text style={styles.countBubble}>{metric.event_count}</Text></View>) : <Text style={styles.emptyText}>{t('noMetrics')}</Text>}</>}
       {rolePicker}
     </ScrollView>
@@ -83,3 +97,12 @@ export function AdminScreen({
 const isLatest = isLatestVerificationDocument;
 const documentNeedsAttention = (document: VerificationDocument, cabs: Cab[]) => document.status !== 'approved' || Boolean(document.expiresOn && document.expiresOn < todayInIndia()) || Boolean(document.type === 'registration' && cabs.find((cab) => cab.id === document.vehicleId)?.registrationUpdatedAt && document.createdAt < cabs.find((cab) => cab.id === document.vehicleId)!.registrationUpdatedAt!);
 const requiredDocsApproved = requiredVerificationDocumentsApproved;
+const historyReasonLabels: Record<string, string> = {
+  reasonPlansChanged: 'reasonPlansChanged', reasonBookedElsewhere: 'reasonBookedElsewhere', reasonWrongDetails: 'reasonWrongDetails',
+  schedule_conflict: 'reasonSchedule', cab_unavailable: 'reasonUnavailable', driver_no_show: 'reasonNoShowDriver', customer_no_show: 'reasonNoShowCustomer',
+};
+const formatHistoryReason = (reason: string) => historyReasonLabels[reason] ?? 'unknownReason';
+const formatHistoryTime = (value: string, hindi: boolean) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(hindi ? 'hi-IN' : 'en-IN');
+};

@@ -160,10 +160,10 @@ For combined states, the story has two independent parts: **Implementation** des
 ### MS-08 — Give admins basic safety and booking controls
 
 - **Requirement / priority:** RQ-08; P1.
-- **Implementation:** Partial: account/vehicle blocks and booking review exist; complete incident-support workflow is absent. **Rollout:** Operational policy/contact pending.
+- **Implementation:** Partial: account/vehicle blocks, booking status/reasons, and a booking-history timeline are implemented in app/schema/demo. A dedicated incident-support workflow and admin status override are not implemented. **Rollout:** Operational policy/contact and live history-RLS validation pending.
 - **User story:** As a stand admin, I want to block unsafe supply and understand cancellation/rejection/no-show outcomes.
 - **Acceptance criteria:** Admin can block/unblock accounts and vehicles; booking state/reason/history is inspectable; supported cancellation/rejection/no-show reason is captured; the interface does not invent a support number; operators have a real help destination before public launch.
-- **Demo path:** Admin screen → block/unblock and review booking statuses/reasons. Support contact is not demoed because none is configured.
+- **Demo path:** Create a request, transition it through owner accept/reject/cancel/complete/no-show actions, then switch to admin and inspect its ordered history. Block/unblock accounts and vehicles. Support contact is not demoed because none is configured.
 - **Code:** `src/screens/AdminScreen.tsx`, `src/components/BookingCard.tsx`, `src/cloudData.ts`.
 - **Open product decision:** Name the support owner/contact and incident escalation procedure.
 

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { BookingStatus, DocumentType, PilotMetric, ReviewStatus, VerificationDocument } from './types';
+import type { BookingStatus, BookingStatusHistoryEntry, DocumentType, PilotMetric, ReviewStatus, VerificationDocument } from './types';
 import { compareVerificationDocuments, requiredVerificationDocumentsApproved } from './verification';
 
 export type CloudRole = 'customer' | 'owner' | 'admin';
@@ -24,6 +24,10 @@ export async function loadCloudData(userId: string, role: CloudRole, profileName
     supabase.from('verification_documents').select('*').order('created_at', { ascending: false }),
   ]);
   fail(carsResult.error); fail(bookingsResult.error); fail(profilesResult.error); fail(documentsResult.error);
+  const bookingHistoryResult = role === 'admin' && (bookingsResult.data ?? []).length
+    ? await supabase.from('booking_status_history').select('id, booking_id, from_status, to_status, actor_id, reason, changed_at').in('booking_id', (bookingsResult.data ?? []).map((booking) => booking.id)).order('changed_at', { ascending: false })
+    : { data: [], error: null };
+  fail(bookingHistoryResult.error);
   const profiles = (profilesResult.data ?? []) as any[];
   const profileById = new Map(profiles.map((p) => [p.id, p]));
   const documents: VerificationDocument[] = ((documentsResult.data ?? []) as any[]).map((d) => ({
@@ -31,6 +35,10 @@ export async function loadCloudData(userId: string, role: CloudRole, profileName
     storagePath: d.storage_path ?? '', status: d.status, expiresOn: d.expires_on,
     rejectionReason: d.rejection_reason, createdAt: d.created_at,
     purgedAt: d.purged_at ?? null, displayWithdrawnAt: d.display_withdrawn_at ?? null,
+  }));
+  const bookingHistory: BookingStatusHistoryEntry[] = ((bookingHistoryResult.data ?? []) as any[]).map((row) => ({
+    id: row.id, bookingId: row.booking_id, fromStatus: row.from_status, toStatus: row.to_status,
+    actorId: row.actor_id, reason: row.reason, changedAt: row.changed_at,
   }));
   const displayPhotos = new Map<string, string>();
   if (role === 'customer') {
@@ -94,7 +102,7 @@ export async function loadCloudData(userId: string, role: CloudRole, profileName
     fail(result.error);
     metrics = ((result.data ?? []) as any[]).map((row) => ({ ...row, event_count: Number(row.event_count) }));
   }
-  return { cabs, bookings, profiles, documents, metrics };
+  return { cabs, bookings, profiles, documents, metrics, bookingHistory };
 }
 
 export async function uploadVerificationDocument(input: { ownerId: string; vehicleId: string | null; type: DocumentType; uri: string; name: string; mimeType: string; expiresOn?: string | null }) {
