@@ -16,6 +16,24 @@ have to re-derive it from scratch by reading git history.
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-03 — display approved driver and optional vehicle photos privately
+
+**Decision:** Reuse the approved driver selfie as the customer-facing driver photo only when the owner opts in. Let owners upload one optional vehicle photo per vehicle. Keep both files in the private evidence bucket, require admin approval before display, and issue short-lived signed links only to customers viewing currently bookable vehicles. Vehicle-photo review never resets approval or affects booking eligibility.
+**Why:** Reusing the selfie avoids collecting a duplicate driver portrait, while explicit opt-in and optional vehicle images improve listings without requiring public exposure or blocking supply. Private storage keeps access scoped to eligible listings and lets operators reject inappropriate photos.
+**Rejected:** Making display photos required for approval, because the user requested optional display; public bucket URLs, because signed links preserve the existing private-evidence boundary.
+
+### 2026-10-03 — build internal Android APKs on main pushes
+
+**Decision:** Use EAS Workflows with a GitHub `push` event for `main` and the `preview` Android APK profile. Increment the build number remotely for each build and distribute through the Expo internal build link.
+**Why:** A merge to `main` should produce an installable demo build without a store submission, and testers need repeat installs to update cleanly.
+**Rejected:** Building on every feature branch push, because demo APKs should reflect the code accepted into `main`; a GitHub Actions workflow with a separate long-lived Expo token, because the linked Expo GitHub App can trigger EAS Workflows directly.
+
+### 2026-10-03 — approve the latest private evidence per driver and vehicle
+
+**Decision:** Store Aadhaar/selfie and vehicle RC/insurance/PUC in a private bucket. Keep document review separate from driver and vehicle approval; only the newest approved file per requirement counts, registration evidence must postdate a registration-number change, insurance and PUC must be unexpired in India time, and replacing evidence resets the affected approval. Keep Aadhaar numbers out of database metadata and use short-lived admin signed links.
+**Why:** Drivers may have several vehicles, and a rejected or replaced file must not be accidentally treated as approved. Database listing and booking gates must fail closed even when a client skips the review UI.
+**Rejected:** One approval flag for the whole account, because it cannot represent one valid vehicle beside another in review; public file links or storing Aadhaar UID in a text field, because they expose sensitive identity data.
+
 ### 2026-10-02 — send owner booking alerts through Expo Push Service
 
 **Decision:** Register owner Expo tokens in Supabase and dispatch generic booking-request notifications from a Supabase Edge Function triggered by a database INSERT webhook. Require a shared webhook secret, recheck owner/vehicle approval before delivery, and include only the booking UUID in notification data.

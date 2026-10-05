@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 import { formatRs } from '../utils';
 import { styles } from '../theme';
 import type { Cab, Hire } from '../types';
@@ -23,11 +23,11 @@ export function CabCard({
 
   return (
     <View style={styles.cabCard}>
-      <View style={styles.carIcon}><Text style={styles.carIconText}>🚕</Text></View>
+      <View style={styles.vehiclePhotoFrame}>{cab.vehiclePhotoUrl?.startsWith('demo-photo://') ? <Text style={styles.carIconText}>🚘</Text> : cab.vehiclePhotoUrl ? <Image accessibilityLabel={t('vehiclePhoto')} source={{ uri: cab.vehiclePhotoUrl }} style={styles.vehiclePhotoImage} /> : <Text style={styles.carIconText}>🚕</Text>}</View>
       <View style={{ flex: 1, minWidth: 120 }}>
         <Text style={styles.cabName}>{cab.name}</Text>
         <Text style={styles.cabMeta}>{t(`vehicle${cab.type}`)} · {cab.seats} {t('seatUnit')}</Text>
-        <Text style={styles.ownerMeta}>{cab.ownerName} · {t('available')}</Text>
+        <View style={styles.driverPhotoRow}><View style={styles.driverPhotoFrame}>{cab.driverPhotoUrl === 'demo-photo://selfie' ? <Text>👤</Text> : cab.driverPhotoUrl ? <Image accessibilityLabel={t('driverPhoto')} source={{ uri: cab.driverPhotoUrl }} style={styles.driverPhotoImage} /> : <Text style={styles.driverInitial}>{cab.ownerName.trim().charAt(0).toUpperCase()}</Text>}</View><View style={{ flex: 1 }}><Text style={styles.ownerMeta}>{cab.ownerName}</Text><Text style={styles.verifiedDriver}>{t('verifiedDriver')} · {t('available')}</Text></View></View>
       </View>
       <View style={styles.rateCol}>
         <Text style={styles.rate}>{formatRs(kind === 'local' ? cab.hourly : cab.perKm)}</Text>

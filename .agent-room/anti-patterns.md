@@ -21,6 +21,18 @@ Append a new entry every time:
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-03 — keep demo admin review controls visible
+
+**What happened:** Demo handlers supported local document and approval changes, but the admin screen hid the approve/reject controls whenever `live` was false.
+**Root cause:** The UI gated all review actions on cloud mode even though handlers already had safe demo branches.
+**Avoid:** Gate backend mutations in handlers; keep equivalent review controls available in demo mode so the end-to-end scenario can be exercised locally.
+
+### 2026-10-03 — keep demo review actions local
+
+**What happened:** Admin approve/reject actions in demo mode called the cloud review functions, so a demo could appear to offer decisions but could not reliably save them and might touch a configured backend.
+**Root cause:** The handlers branched on cloud session for some admin actions but sent owner/vehicle review straight to Supabase even when the role picker was in demo mode.
+**Avoid:** Give demo state explicit local review handlers and make cloud mutation depend on an authenticated cloud user; seed demo records with real review states so the same eligibility checks can be demonstrated.
+
 ### 2026-10-02 — do not let pending requests block slots forever
 
 **What happened:** A pending booking was treated as an active slot conflict indefinitely, even when its owner stopped using the app.

@@ -2,15 +2,17 @@
 
 Android-first cab booking MVP for a rural market. It includes Supabase phone/password accounts and shared booking data, plus a Hindi-first demo mode that saves sample bookings and vehicle changes on the current device.
 
+For product scope, the current feature map, epic/story acceptance criteria, and roadmap, start at [the product and engineering handoff](docs/product/README.md).
+
 ## What works in the demo
 
 - Customer: register/login, choose local hourly/full-day or outstation per-km hire, filter vehicle types, enter date/time and trip details, see estimates, request a cab, view driver details after acceptance, and cancel.
 - Owner: register/login, submit vehicle registration for review, set rates and daily hours, manage availability, accept/decline requests, and mark completed trips.
-- Admin: approve/reject owners and vehicles, block/unblock accounts, view booking status history through the database, and see weekly pilot event counts.
+- Admin: review driver Aadhaar/selfie and vehicle RC/insurance/PUC files individually, approve/reject owners and vehicles, block/unblock accounts, view booking status history, and see weekly pilot event counts.
 - Hindi/English toggle, pickup place suggestions, and optional device-location pickup.
 - Data persists on the current device with AsyncStorage.
 
-The demo role switch is visible only in demo mode. Cloud mode uses Supabase auth and row-level policies. Owners can opt in to Android push alerts for new booking requests. The Google Ads space is a placeholder; real ad serving requires an AdMob account and Google Mobile Ads integration.
+The demo role switch is visible only in demo mode. It includes a fully approved bookable driver, a driver with a rejected selfie, a vehicle with rejected insurance, a vehicle with expired insurance, and optional vehicle-photo review. Owners can opt in to showing their approved selfie on customer listings. Approved selfie and vehicle-photo states use placeholders in demo mode; demo files are synthetic and never contain real documents. Cloud mode uses Supabase auth and row-level policies. Owners can opt in to Android push alerts for new booking requests. The Google Ads space is a placeholder; real ad serving requires an AdMob account and Google Mobile Ads integration.
 
 ## Run on Android
 
@@ -23,7 +25,7 @@ The booking flow does not use a map. Pickup search uses Photon place suggestions
 ## Connect Supabase
 
 1. Add your Supabase project URL and publishable key to `.env.local`. Never put a service-role key in the app.
-2. In the Supabase SQL Editor, run `supabase/schema.sql` once, then run the files in `supabase/migrations/` in timestamp order. The first migration adds booking statuses; the second adds approval, expiry, availability, history, and pilot metrics. Existing owner and vehicle records become unavailable until an admin reviews them.
+2. In the Supabase SQL Editor, run `supabase/schema.sql` once, then run the files in `supabase/migrations/` in timestamp order. The migrations add booking statuses, owner/vehicle approvals, private verification-document storage, expiry, availability, history, and pilot metrics. Existing owners and vehicles remain unavailable until they provide and receive approval for the required documents.
 3. In Supabase Authentication settings, enable sign-up with phone numbers and turn off phone confirmation. No Twilio or SMS setup is needed when confirmation is off. Phone numbers will not be checked during sign-up.
 
 ## Sign in or create an account
@@ -44,7 +46,9 @@ For an EAS/store build, configure `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SU
 
 The SQL defines profiles, vehicles, bookings, cash-only payment, customer/owner/admin policies, owner and vehicle review, booking expiry, status history, device push tokens, and privacy-limited pilot metrics. The first admin role must be granted from the SQL editor. A new cloud signup is set to customer or owner from the role chosen in the app; admin cannot be self-selected. Without phone confirmation, people can sign up using a phone number they do not own.
 
-To make the first administrator, update a customer profile to `role = 'admin'`. To review an owner, approve the owner account first, then approve each vehicle after confirming its registration number. The owner must turn availability on after vehicle approval.
+To make the first administrator, update a customer profile to `role = 'admin'`. Drivers submit a private Aadhaar identity file and a selfie; each vehicle needs a registration certificate, current insurance, and current PUC certificate. Admins review each latest file, choose a reason when requesting a replacement, approve the driver, approve each vehicle, and then the owner turns availability on. Replacing a reviewed file or changing a registration number sends the affected approval back to review; after a registration change, the RC must be uploaded again. Expired insurance or PUC files immediately remove that vehicle from search and booking until replaced and reapproved.
+
+Verification files are stored in a private Supabase Storage bucket. Admin file links expire after five minutes; filenames and Aadhaar numbers are not copied into the database. The app does not yet define automatic evidence retention/deletion, so decide an operational retention period before collecting real Aadhaar files.
 
 ## MVP decisions / follow-up
 
