@@ -20,7 +20,7 @@ import { supabase, supabaseReady } from './src/supabase';
 import { C, styles } from './src/theme';
 import { translate, type CopyKey } from './src/i18n';
 import { defaultDate, formatRs, todayInIndia } from './src/utils';
-import type { Account, Booking, BookingStatus, Cab, DocumentType, Hire, ReviewStatus, Role, Store, VehicleType, VerificationDocument } from './src/types';
+import type { Account, Booking, BookingStatus, BookingStatusHistoryEntry, Cab, DocumentType, Hire, ReviewStatus, Role, Store, VehicleType, VerificationDocument } from './src/types';
 import { AppHeader, FormField, PrimaryButton, RolePicker } from './src/components/Primitives';
 import { BookingConfirmation } from './src/components/BookingConfirmation';
 import { BottomNavigation } from './src/components/BottomNavigation';
@@ -169,7 +169,7 @@ export default function App() {
       if (!active) return;
       const account = profileData as Account;
       setProfile(account); setRole(account.role);
-      setStore((current) => ({ ...INITIAL, ...current, blockedOwners: [], blockedCustomers: [], blockedVehicles: [], cabs: loaded.cabs, bookings: loaded.bookings, customerName: account.full_name || t('customerGeneric'), profiles: loaded.profiles, documents: loaded.documents, metrics: loaded.metrics }));
+      setStore((current) => ({ ...INITIAL, ...current, blockedOwners: [], blockedCustomers: [], blockedVehicles: [], cabs: loaded.cabs, bookings: loaded.bookings, customerName: account.full_name || t('customerGeneric'), profiles: loaded.profiles, documents: loaded.documents, metrics: loaded.metrics, bookingHistory: loaded.bookingHistory }));
       setPage(account.role === 'customer' ? 'home' : account.role === 'owner' ? 'owner' : 'admin');
     })().catch((error: unknown) => {
       if (active) { setSyncIssue(true); Alert.alert(t('loadFailed'), error instanceof Error ? error.message : String(error)); }
@@ -233,7 +233,7 @@ export default function App() {
       }
       const account = profileData as Account;
       const loaded = await loadCloudData(cloudUser.id, account.role, account.full_name, account.phone, account.owner_review_status);
-      setStore((current) => ({ ...current, cabs: loaded.cabs, bookings: loaded.bookings, profiles: loaded.profiles, documents: loaded.documents, metrics: loaded.metrics }));
+      setStore((current) => ({ ...current, cabs: loaded.cabs, bookings: loaded.bookings, profiles: loaded.profiles, documents: loaded.documents, metrics: loaded.metrics, bookingHistory: loaded.bookingHistory }));
       setProfile(account);
       setRole(account.role);
       setSyncIssue(false);
@@ -293,7 +293,11 @@ export default function App() {
         const created = await createCloudBooking({ customerId: cloudUser.id, customerName: store.customerName, cabId: cab.id, rideType: kind, vehicleType: cab.type, date, time, hours: Number(hours) || 1, pickupLocation: pickupArea, destination: item.destination, km: item.km, estimate: item.estimate, requestKey: submissionKey });
         item.id = created.id;
         setStore((s) => ({ ...s, bookings: [item, ...s.bookings.filter((booking) => booking.id !== created.id)] }));
-      } else setStore((s) => ({ ...s, bookings: [item, ...s.bookings] }));
+      } else setStore((s) => ({
+        ...s,
+        bookings: [item, ...s.bookings],
+        bookingHistory: [demoHistoryEntry(item.id, null, 'pending', null), ...(s.bookingHistory ?? [])],
+      }));
       bookingRequestKey.current = null;
       setSelectedCab(cab); setPage('bookings');
       Alert.alert(t('requestConfirmed'), t('requestPending'));
@@ -312,7 +316,15 @@ export default function App() {
     if (cloudUser && status !== 'pending') {
       try { await setCloudBookingStatus(id, status, reason); await refreshCloud(); }
       catch (error) { Alert.alert(t('updateFailed'), error instanceof Error ? error.message : String(error)); }
-    } else setStore((s) => ({ ...s, bookings: s.bookings.map((b) => b.id === id ? { ...b, status, statusReason: reason ?? null } : b) }));
+    } else setStore((s) => {
+      const booking = s.bookings.find((item) => item.id === id);
+      if (!booking || booking.status === status) return s;
+      return {
+        ...s,
+        bookings: s.bookings.map((item) => item.id === id ? { ...item, status, statusReason: reason ?? null } : item),
+        bookingHistory: [demoHistoryEntry(id, booking.status, status, reason ?? null), ...(s.bookingHistory ?? [])],
+      };
+    });
   };
   const addCab = async () => {
     if (!newName.trim()) { Alert.alert(t('enterVehicleName')); return; }
@@ -537,6 +549,10 @@ function isDisplayableDemoPhoto(documents: VerificationDocument[], ownerId: stri
   return latest?.status === 'approved' && !latest.purgedAt && !latest.displayWithdrawnAt;
 }
 
+function demoHistoryEntry(bookingId: string, fromStatus: BookingStatus | null, toStatus: BookingStatus, reason: string | null): BookingStatusHistoryEntry {
+  return { id: `demo-history-${Date.now()}-${Math.random()}`, bookingId, fromStatus, toStatus, actorId: null, reason, changedAt: new Date().toISOString() };
+}
+
 function restoreDemoStore(saved: Partial<Store>): Store {
   const savedCabs = saved.cabs ?? INITIAL.cabs;
   const cabs = savedCabs.map((cab) => {
@@ -550,5 +566,6 @@ function restoreDemoStore(saved: Partial<Store>): Store {
     cabs,
     profiles: saved.profiles?.length ? saved.profiles : INITIAL.profiles,
     documents: saved.documents?.length ? saved.documents : INITIAL.documents,
+    bookingHistory: saved.bookingHistory ?? [],
   };
 }

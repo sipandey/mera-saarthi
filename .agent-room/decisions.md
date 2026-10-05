@@ -16,6 +16,12 @@ have to re-derive it from scratch by reading git history.
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-05 — show booking audit history only in admin operations
+
+**Decision:** Load `booking_status_history` only for the admin role and show its status transitions, reasons, actor labels, and timestamps in the admin booking list. Keep demo history synthetic and record every demo transition locally.
+**Why:** The database already records the audit trail and grants admins read access. Surfacing it makes cancellations, no-shows, and completions actionable without adding a redundant audit table or exposing operator history in customer screens.
+**Rejected:** Reconstructing past events from the current booking row, because that loses transition order and reasons; adding a support contact to the interface, because the real operator destination has not been provided.
+
 ### 2026-10-05 — purge verification bytes separately from approval metadata
 
 **Decision:** Keep approved status/expiry/reviewer metadata so active booking gates remain valid, but purge private Storage bytes 30 days after approval, rejection, replacement, expiry, or photo-consent withdrawal as applicable. Use a service-only queue and Edge Function that deletes through the Storage API; an opted-in selfie remains available until consent is withdrawn. An owner can withdraw an optional vehicle photo, which stops display immediately and starts its purge window.

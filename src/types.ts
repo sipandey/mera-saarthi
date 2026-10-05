@@ -10,6 +10,10 @@ export type VerificationDocument = {
   purgedAt?: string | null; displayWithdrawnAt?: string | null;
 };
 export type BookingStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'expired' | 'completed';
+export type BookingStatusHistoryEntry = {
+  id: number | string; bookingId: string; fromStatus: BookingStatus | null; toStatus: BookingStatus;
+  actorId: string | null; reason: string | null; changedAt: string;
+};
 export type Cab = {
   id: string; ownerId: string; ownerName: string; phone: string; name: string;
   type: VehicleType; seats: number; available: boolean; hourly: number; fullDay: number; perKm: number;
@@ -25,5 +29,5 @@ export type Booking = {
   km: number; estimate: number; perKmRate: number; status: BookingStatus; statusReason?: string | null; requestKey?: string;
 };
 export type Account = { id: string; role: Role; full_name: string; phone: string; is_blocked: boolean; owner_review_status?: ReviewStatus | null; show_driver_photo?: boolean };
-export type Store = { cabs: Cab[]; bookings: Booking[]; blockedOwners: string[]; blockedCustomers: string[]; blockedVehicles: string[]; customerName: string; profiles: Account[]; documents?: VerificationDocument[]; metrics?: PilotMetric[] };
+export type Store = { cabs: Cab[]; bookings: Booking[]; blockedOwners: string[]; blockedCustomers: string[]; blockedVehicles: string[]; customerName: string; profiles: Account[]; documents?: VerificationDocument[]; metrics?: PilotMetric[]; bookingHistory?: BookingStatusHistoryEntry[] };
 export type PilotMetric = { week_start: string; event_name: string; event_count: number };
