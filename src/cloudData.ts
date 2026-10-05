@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
-import type { BookingStatus, PilotMetric, ReviewStatus } from './types';
+import type { BookingStatus, DocumentType, PilotMetric, ReviewStatus, VerificationDocument } from './types';
+import { todayInIndia } from './utils';
 
 export type CloudRole = 'customer' | 'owner' | 'admin';
 
@@ -8,7 +9,7 @@ const asText = (value: string | null | undefined) => value ?? '';
 const localDate = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
 const localTime = (value: Date) => `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
 
-export async function loadCloudData(userId: string, role: CloudRole, profileName: string, profilePhone: string) {
+export async function loadCloudData(userId: string, role: CloudRole, profileName: string, profilePhone: string, ownerReviewStatus?: ReviewStatus | null) {
   if (!supabase) throw new Error('Supabase is not configured.');
   const carsQuery = role === 'customer'
     ? supabase.from('available_vehicles').select('*')
@@ -16,25 +17,55 @@ export async function loadCloudData(userId: string, role: CloudRole, profileName
   const expiryResult = await supabase.rpc('expire_stale_bookings');
   fail(expiryResult.error);
   const bookingsQuery = supabase.from('bookings').select('*').order('pickup_at', { ascending: true });
-  const [carsResult, bookingsResult, profilesResult] = await Promise.all([
+  const [carsResult, bookingsResult, profilesResult, documentsResult] = await Promise.all([
     carsQuery,
     bookingsQuery,
     role === 'admin' ? supabase.from('profiles').select('id, role, full_name, phone, is_blocked, owner_review_status, created_at') : Promise.resolve({ data: [], error: null }),
+    supabase.from('verification_documents').select('*').order('created_at', { ascending: false }),
   ]);
-  fail(carsResult.error); fail(bookingsResult.error); fail(profilesResult.error);
+  fail(carsResult.error); fail(bookingsResult.error); fail(profilesResult.error); fail(documentsResult.error);
   const profiles = (profilesResult.data ?? []) as any[];
   const profileById = new Map(profiles.map((p) => [p.id, p]));
+  const documents: VerificationDocument[] = ((documentsResult.data ?? []) as any[]).map((d) => ({
+    id: d.id, ownerId: d.owner_id, vehicleId: d.vehicle_id, type: d.document_type,
+    storagePath: d.storage_path, status: d.status, expiresOn: d.expires_on,
+    rejectionReason: d.rejection_reason, createdAt: d.created_at,
+  }));
+  const displayPhotos = new Map<string, string>();
+  if (role === 'customer') {
+    const latestDisplayDocuments = documents.filter((document) => document.status === 'approved' && (document.type === 'selfie' || document.type === 'vehicle_photo'))
+      .reduce((latest, document) => {
+        const key = `${document.type}:${document.type === 'selfie' ? document.ownerId : document.vehicleId}`;
+        const previous = latest.get(key);
+        if (!previous || document.createdAt > previous.createdAt || (document.createdAt === previous.createdAt && document.id > previous.id)) latest.set(key, document);
+        return latest;
+      }, new Map<string, VerificationDocument>());
+    await Promise.all([...latestDisplayDocuments.entries()].map(async ([key, document]) => {
+      const { data, error } = await supabase!.storage.from('verification-documents').createSignedUrl(document.storagePath, 300);
+      if (!error && data?.signedUrl) displayPhotos.set(key, data.signedUrl);
+    }));
+  }
+  const documentsApproved = (ownerId: string, vehicleId: string | null, types: DocumentType[], registrationUpdatedAt?: string) => types.every((type) => {
+    const latest = documents.filter((d) => d.ownerId === ownerId && d.vehicleId === vehicleId && d.type === type).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    const registrationCurrent = type !== 'registration' || !registrationUpdatedAt || Boolean(latest?.createdAt && latest.createdAt >= registrationUpdatedAt);
+    return latest?.status === 'approved' && registrationCurrent && (!latest.expiresOn || latest.expiresOn >= todayInIndia());
+  });
   const cabs = ((carsResult.data ?? []) as any[]).map((v) => {
     const owner = profileById.get(v.owner_id);
+    const ownerApproved = owner?.owner_review_status === 'approved' || (role === 'owner' && v.owner_id === userId && ownerReviewStatus === 'approved');
+    const reviewReady = role === 'customer' || (ownerApproved && documentsApproved(v.owner_id, null, ['aadhaar', 'selfie']) && documentsApproved(v.owner_id, v.id, ['registration', 'insurance', 'pollution'], v.registration_updated_at));
     return {
       id: v.id, ownerId: v.owner_id, ownerName: asText(v.owner_name) || asText(owner?.full_name) || profileName,
       phone: asText(owner?.phone) || (v.owner_id === userId ? profilePhone : ''),
-      name: v.name, type: v.vehicle_type, seats: v.seats, available: v.is_available,
+      name: v.name, type: v.vehicle_type, seats: v.seats, available: v.is_available && reviewReady,
       hourly: Number(v.hourly_rate), fullDay: Number(v.full_day_rate), perKm: Number(v.per_km_rate),
       blocked: Boolean(v.is_blocked),
       registrationNumber: v.registration_number ?? '', reviewStatus: v.review_status ?? 'approved',
       availabilityStart: v.availability_start ?? null, availabilityEnd: v.availability_end ?? null,
       availabilityUpdatedAt: v.availability_updated_at ?? '',
+      registrationUpdatedAt: v.registration_updated_at ?? '',
+      driverPhotoUrl: displayPhotos.get(`selfie:${v.owner_id}`),
+      vehiclePhotoUrl: displayPhotos.get(`vehicle_photo:${v.id}`),
     };
   });
   const cabById = new Map(cabs.map((c) => [c.id, c]));
@@ -65,7 +96,49 @@ export async function loadCloudData(userId: string, role: CloudRole, profileName
     fail(result.error);
     metrics = ((result.data ?? []) as any[]).map((row) => ({ ...row, event_count: Number(row.event_count) }));
   }
-  return { cabs, bookings, profiles, metrics };
+  return { cabs, bookings, profiles, documents, metrics };
+}
+
+export async function uploadVerificationDocument(input: { ownerId: string; vehicleId: string | null; type: DocumentType; uri: string; name: string; mimeType: string; expiresOn?: string | null }) {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const file = await fetch(input.uri);
+  const bytes = await file.arrayBuffer();
+  const id = `${Date.now()}-${Math.floor(Math.random() * 1_000_000_000)}`;
+  const extension = input.name.split('.').pop()?.replace(/[^a-z\d]/gi, '').toLowerCase() || 'bin';
+  const storagePath = `${input.ownerId}/${id}.${extension}`;
+  const uploaded = await supabase.storage.from('verification-documents').upload(storagePath, bytes, { contentType: input.mimeType, upsert: false });
+  fail(uploaded.error);
+  const saved = await supabase.from('verification_documents').insert({
+    owner_id: input.ownerId, vehicle_id: input.vehicleId, document_type: input.type,
+    storage_path: storagePath, status: 'pending', expires_on: input.expiresOn ?? null,
+  });
+  if (saved.error) {
+    await supabase.storage.from('verification-documents').remove([storagePath]);
+    fail(saved.error);
+  }
+  if (input.type === 'vehicle_photo') {
+    return;
+  } else if (input.vehicleId) {
+    const reset = await supabase.from('vehicles').update({ review_status: 'pending', is_available: false }).eq('id', input.vehicleId);
+    fail(reset.error);
+  } else {
+    const reset = await supabase.from('profiles').update({ owner_review_status: 'pending' }).eq('id', input.ownerId);
+    fail(reset.error);
+  }
+}
+
+export async function openVerificationDocument(path: string) {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { data, error } = await supabase.storage.from('verification-documents').createSignedUrl(path, 300);
+  fail(error);
+  if (!data?.signedUrl) throw new Error('Could not open this document.');
+  return data.signedUrl;
+}
+
+export async function reviewVerificationDocument(id: string, status: ReviewStatus, reason?: string) {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { error } = await supabase.from('verification_documents').update({ status, rejection_reason: status === 'rejected' ? reason : null, reviewed_at: new Date().toISOString() }).eq('id', id);
+  fail(error);
 }
 
 export async function createCloudBooking(input: {
@@ -139,6 +212,12 @@ export async function setCloudAccountBlocked(id: string, blocked: boolean) {
 export async function setCloudOwnerReviewStatus(id: string, status: ReviewStatus) {
   if (!supabase) throw new Error('Supabase is not configured.');
   const { error } = await supabase.from('profiles').update({ owner_review_status: status }).eq('id', id);
+  fail(error);
+}
+
+export async function setCloudDriverPhotoVisibility(ownerId: string, show: boolean) {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { error } = await supabase.from('profiles').update({ show_driver_photo: show }).eq('id', ownerId);
   fail(error);
 }
 

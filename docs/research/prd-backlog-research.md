@@ -1,5 +1,7 @@
 # PRD backlog implementation research
 
+> **Historical snapshot (2 Oct 2026):** this research predates document verification, optional display photos, and the current product crosswalk. Use [the product handoff](../product/README.md), [current application map](../product/current-state.md), and [epics and stories](../plans/prd-backlog-implementation.md) as the active source of truth. The investigation below is retained for its rationale and must not be treated as a current code inventory.
+
 **Reviewed:** 2 Oct 2026
 **Scope:** Supabase-backed Android pilot; no-SMS phone/password; one Indian pilot market; cash-only.
 

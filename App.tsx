@@ -1,9 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as Notifications from 'expo-notifications';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   SafeAreaView,
@@ -12,12 +15,12 @@ import {
   Text,
   View,
 } from 'react-native';
-import { loadCloudData, createCloudBooking, setCloudBookingStatus, saveCloudVehicle, editCloudVehicle, updateCloudAvailability, setCloudAccountBlocked, setCloudOwnerReviewStatus, setCloudVehicleReviewStatus, setCloudVehicleBlocked, saveCloudPushToken, removeCloudPushToken, trackPilotEvent } from './src/cloudData';
+import { loadCloudData, createCloudBooking, setCloudBookingStatus, saveCloudVehicle, editCloudVehicle, updateCloudAvailability, setCloudAccountBlocked, setCloudOwnerReviewStatus, setCloudDriverPhotoVisibility, setCloudVehicleReviewStatus, setCloudVehicleBlocked, saveCloudPushToken, removeCloudPushToken, trackPilotEvent, uploadVerificationDocument, openVerificationDocument, reviewVerificationDocument } from './src/cloudData';
 import { supabase, supabaseReady } from './src/supabase';
 import { C, styles } from './src/theme';
 import { translate, type CopyKey } from './src/i18n';
-import { defaultDate, formatRs } from './src/utils';
-import type { Account, Booking, BookingStatus, Cab, Hire, ReviewStatus, Role, Store, VehicleType } from './src/types';
+import { defaultDate, formatRs, todayInIndia } from './src/utils';
+import type { Account, Booking, BookingStatus, Cab, DocumentType, Hire, ReviewStatus, Role, Store, VehicleType, VerificationDocument } from './src/types';
 import { AppHeader, FormField, PrimaryButton, RolePicker } from './src/components/Primitives';
 import { BookingConfirmation } from './src/components/BookingConfirmation';
 import { BottomNavigation } from './src/components/BottomNavigation';
@@ -27,13 +30,46 @@ import { AdminScreen } from './src/screens/AdminScreen';
 import { registerOwnerPushNotifications } from './src/pushNotifications';
 
 const KEY = 'mera-saarthi-demo-v1';
+const DEMO_DATE = '2026-10-03T09:00:00.000Z';
 const INITIAL: Store = {
   cabs: [
-    { id: 'cab-a', ownerId: 'owner-a', ownerName: 'Ramesh Kumar', phone: '98765 43210', name: 'Maruti Swift', type: 'Hatchback', seats: 4, available: true, hourly: 180, fullDay: 1400, perKm: 12 },
-    { id: 'cab-b', ownerId: 'owner-b', ownerName: 'Suresh Yadav', phone: '98765 12340', name: 'Mahindra Bolero', type: 'SUV', seats: 7, available: true, hourly: 250, fullDay: 2000, perKm: 16 },
-    { id: 'cab-c', ownerId: 'owner-c', ownerName: 'Amit Patel', phone: '98765 56780', name: 'Maruti Dzire', type: 'Sedan', seats: 4, available: true, hourly: 200, fullDay: 1600, perKm: 14 },
+    { id: 'cab-a', ownerId: 'owner-a', ownerName: 'Ramesh Kumar', phone: '98765 43210', name: 'Maruti Swift', type: 'Hatchback', seats: 4, available: true, hourly: 180, fullDay: 1400, perKm: 12, registrationNumber: 'RJ 14 AB 1234', reviewStatus: 'approved', registrationUpdatedAt: DEMO_DATE },
+    { id: 'cab-b', ownerId: 'owner-b', ownerName: 'Suresh Yadav', phone: '98765 12340', name: 'Mahindra Bolero', type: 'SUV', seats: 7, available: false, hourly: 250, fullDay: 2000, perKm: 16, registrationNumber: 'RJ 14 CD 5678', reviewStatus: 'pending', registrationUpdatedAt: DEMO_DATE },
+    { id: 'cab-c', ownerId: 'owner-c', ownerName: 'Amit Patel', phone: '98765 56780', name: 'Maruti Dzire', type: 'Sedan', seats: 4, available: false, hourly: 200, fullDay: 1600, perKm: 14, registrationNumber: 'RJ 14 EF 9012', reviewStatus: 'pending', registrationUpdatedAt: DEMO_DATE },
+    { id: 'cab-d', ownerId: 'owner-d', ownerName: 'Meena Devi', phone: '98765 24680', name: 'Tata Tigor', type: 'Sedan', seats: 4, available: false, hourly: 210, fullDay: 1700, perKm: 14, registrationNumber: 'RJ 14 GH 3456', reviewStatus: 'approved', registrationUpdatedAt: DEMO_DATE },
   ],
-  bookings: [], blockedOwners: [], blockedCustomers: [], blockedVehicles: [], customerName: 'Guest Customer', profiles: [], metrics: [],
+  bookings: [], blockedOwners: [], blockedCustomers: [], blockedVehicles: [], customerName: 'Guest Customer',
+  profiles: [
+    { id: 'owner-a', role: 'owner', full_name: 'Ramesh Kumar', phone: '98765 43210', is_blocked: false, owner_review_status: 'approved', show_driver_photo: true },
+    { id: 'owner-b', role: 'owner', full_name: 'Suresh Yadav', phone: '98765 12340', is_blocked: false, owner_review_status: 'pending' },
+    { id: 'owner-c', role: 'owner', full_name: 'Amit Patel', phone: '98765 56780', is_blocked: false, owner_review_status: 'approved' },
+    { id: 'owner-d', role: 'owner', full_name: 'Meena Devi', phone: '98765 24680', is_blocked: false, owner_review_status: 'approved' },
+    { id: 'customer-demo', role: 'customer', full_name: 'Guest Customer', phone: '—', is_blocked: false },
+  ],
+  documents: [
+    { id: 'demo-1', ownerId: 'owner-a', vehicleId: null, type: 'aadhaar', storagePath: 'demo://aadhaar', status: 'approved', expiresOn: null, rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-2', ownerId: 'owner-a', vehicleId: null, type: 'selfie', storagePath: 'demo://selfie', status: 'approved', expiresOn: null, rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-3', ownerId: 'owner-a', vehicleId: 'cab-a', type: 'registration', storagePath: 'demo://rc', status: 'approved', expiresOn: null, rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-4', ownerId: 'owner-a', vehicleId: 'cab-a', type: 'insurance', storagePath: 'demo://insurance', status: 'approved', expiresOn: '2027-03-31', rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-5', ownerId: 'owner-a', vehicleId: 'cab-a', type: 'pollution', storagePath: 'demo://puc', status: 'approved', expiresOn: '2027-01-31', rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-21', ownerId: 'owner-a', vehicleId: 'cab-a', type: 'vehicle_photo', storagePath: 'demo://vehicle-photo', status: 'approved', expiresOn: null, rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-6', ownerId: 'owner-b', vehicleId: null, type: 'aadhaar', storagePath: 'demo://aadhaar-b', status: 'pending', expiresOn: null, rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-7', ownerId: 'owner-b', vehicleId: null, type: 'selfie', storagePath: 'demo://selfie-b', status: 'rejected', expiresOn: null, rejectionReason: 'Image is unclear; upload a readable copy.', createdAt: DEMO_DATE },
+    { id: 'demo-8', ownerId: 'owner-b', vehicleId: 'cab-b', type: 'registration', storagePath: 'demo://rc-b', status: 'pending', expiresOn: null, rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-9', ownerId: 'owner-b', vehicleId: 'cab-b', type: 'insurance', storagePath: 'demo://insurance-b', status: 'pending', expiresOn: '2027-02-01', rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-10', ownerId: 'owner-b', vehicleId: 'cab-b', type: 'pollution', storagePath: 'demo://puc-b', status: 'pending', expiresOn: '2027-01-01', rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-22', ownerId: 'owner-b', vehicleId: 'cab-b', type: 'vehicle_photo', storagePath: 'demo://vehicle-photo-b', status: 'pending', expiresOn: null, rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-11', ownerId: 'owner-c', vehicleId: null, type: 'aadhaar', storagePath: 'demo://aadhaar-c', status: 'approved', expiresOn: null, rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-12', ownerId: 'owner-c', vehicleId: null, type: 'selfie', storagePath: 'demo://selfie-c', status: 'approved', expiresOn: null, rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-13', ownerId: 'owner-c', vehicleId: 'cab-c', type: 'registration', storagePath: 'demo://rc-c', status: 'approved', expiresOn: null, rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-14', ownerId: 'owner-c', vehicleId: 'cab-c', type: 'insurance', storagePath: 'demo://insurance-c', status: 'rejected', expiresOn: '2027-02-01', rejectionReason: 'Image is unclear; upload a readable copy.', createdAt: DEMO_DATE },
+    { id: 'demo-15', ownerId: 'owner-c', vehicleId: 'cab-c', type: 'pollution', storagePath: 'demo://puc-c', status: 'approved', expiresOn: '2027-01-01', rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-16', ownerId: 'owner-d', vehicleId: null, type: 'aadhaar', storagePath: 'demo://aadhaar-d', status: 'approved', expiresOn: null, rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-17', ownerId: 'owner-d', vehicleId: null, type: 'selfie', storagePath: 'demo://selfie-d', status: 'approved', expiresOn: null, rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-18', ownerId: 'owner-d', vehicleId: 'cab-d', type: 'registration', storagePath: 'demo://rc-d', status: 'approved', expiresOn: null, rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-19', ownerId: 'owner-d', vehicleId: 'cab-d', type: 'insurance', storagePath: 'demo://insurance-d', status: 'approved', expiresOn: '2025-12-31', rejectionReason: null, createdAt: DEMO_DATE },
+    { id: 'demo-20', ownerId: 'owner-d', vehicleId: 'cab-d', type: 'pollution', storagePath: 'demo://puc-d', status: 'approved', expiresOn: '2027-04-30', rejectionReason: null, createdAt: DEMO_DATE },
+  ], metrics: [],
 };
 
 const requestKey = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
@@ -68,6 +104,7 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [authRole, setAuthRole] = useState<'customer' | 'owner'>('customer');
   const [demoMode, setDemoMode] = useState(false);
+  const [demoOwnerId, setDemoOwnerId] = useState('owner-a');
   const [kind, setKind] = useState<Hire>('local');
   const [vehicleType, setVehicleType] = useState<VehicleType | 'Any'>('Any');
   const [date, setDate] = useState(defaultDate());
@@ -86,6 +123,7 @@ export default function App() {
   const [newRegistration, setNewRegistration] = useState('');
   const [newAvailabilityStart, setNewAvailabilityStart] = useState('');
   const [newAvailabilityEnd, setNewAvailabilityEnd] = useState('');
+  const [vehicleExpiryDates, setVehicleExpiryDates] = useState<Record<string, { insurance: string; pollution: string }>>({});
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const bookingRequestKey = useRef<string | null>(null);
   const bookingInFlight = useRef(false);
@@ -97,7 +135,7 @@ export default function App() {
   const t = (key: string) => translate(key as CopyKey, hindi ? 'hi' : 'en');
   useEffect(() => {
     AsyncStorage.getItem(KEY).then((saved) => {
-      if (saved) setStore({ ...INITIAL, ...JSON.parse(saved) });
+      if (saved) setStore(restoreDemoStore(JSON.parse(saved)));
       setReady(true);
     }).catch(() => setReady(true));
   }, []);
@@ -120,17 +158,17 @@ export default function App() {
     let active = true;
     setCloudLoading(true);
     (async () => {
-      const { data: profileData, error } = await supabase.from('profiles').select('id, role, full_name, phone, is_blocked, owner_review_status').eq('id', cloudUser.id).single();
+      const { data: profileData, error } = await supabase.from('profiles').select('id, role, full_name, phone, is_blocked, owner_review_status, show_driver_photo').eq('id', cloudUser.id).single();
       if (error) throw new Error(error.message);
       if (profileData.is_blocked) {
         await supabase.auth.signOut();
         throw new Error(t('blockedAccount'));
       }
-      const loaded = await loadCloudData(cloudUser.id, profileData.role, profileData.full_name, profileData.phone);
+      const loaded = await loadCloudData(cloudUser.id, profileData.role, profileData.full_name, profileData.phone, profileData.owner_review_status);
       if (!active) return;
       const account = profileData as Account;
       setProfile(account); setRole(account.role);
-      setStore((current) => ({ ...INITIAL, ...current, blockedOwners: [], blockedCustomers: [], blockedVehicles: [], cabs: loaded.cabs, bookings: loaded.bookings, customerName: account.full_name || t('customerGeneric'), profiles: loaded.profiles, metrics: loaded.metrics }));
+      setStore((current) => ({ ...INITIAL, ...current, blockedOwners: [], blockedCustomers: [], blockedVehicles: [], cabs: loaded.cabs, bookings: loaded.bookings, customerName: account.full_name || t('customerGeneric'), profiles: loaded.profiles, documents: loaded.documents, metrics: loaded.metrics }));
       setPage(account.role === 'customer' ? 'home' : account.role === 'owner' ? 'owner' : 'admin');
     })().catch((error: unknown) => {
       if (active) { setSyncIssue(true); Alert.alert(t('loadFailed'), error instanceof Error ? error.message : String(error)); }
@@ -148,14 +186,22 @@ export default function App() {
         const end = start + Math.max(1, b.hours || 1) * 60 * 60 * 1000;
         return Number.isFinite(start) && requestedStart < end && start < requestedEnd;
       });
-      return cab.available && cab.reviewStatus !== 'pending' && cab.reviewStatus !== 'rejected' && !cab.blocked && !store.blockedVehicles.includes(cab.id) && !store.blockedOwners.includes(cab.ownerId) && (vehicleType === 'Any' || cab.type === vehicleType) && withinAvailability(cab, time, Math.max(1, Number(hours) || 1)) && !conflict;
+      const owner = cloudUser ? { owner_review_status: 'approved' as const } : store.profiles.find((item) => item.id === cab.ownerId);
+      const driverDocsReady = Boolean(cloudUser) || requiredDocumentsApproved(store.documents ?? [], cab.ownerId, null, ['aadhaar', 'selfie']);
+      const vehicleDocsReady = Boolean(cloudUser) || requiredDocumentsApproved(store.documents ?? [], cab.ownerId, cab.id, ['registration', 'insurance', 'pollution'], cab.registrationUpdatedAt);
+      return cab.available && cab.reviewStatus === 'approved' && owner?.owner_review_status === 'approved' && driverDocsReady && vehicleDocsReady && !cab.blocked && !store.blockedVehicles.includes(cab.id) && !store.blockedOwners.includes(cab.ownerId) && (vehicleType === 'Any' || cab.type === vehicleType) && withinAvailability(cab, time, Math.max(1, Number(hours) || 1)) && !conflict;
     });
     const quote = (cab: Cab) => kind === 'local'
       ? (Number(hours) >= 8 ? cab.fullDay : cab.hourly * Math.max(1, Number(hours) || 1))
       : cab.perKm;
-    return available.sort((a, b) => quote(a) - quote(b) || a.name.localeCompare(b.name));
-  }, [store, vehicleType, date, time, hours, kind]);
-  const cabsOpenForSearch = store.cabs.filter((cab) => cab.available && !cab.blocked && !store.blockedVehicles.includes(cab.id) && !store.blockedOwners.includes(cab.ownerId));
+    const withDemoPhotos = demoMode ? available.map((cab) => ({
+      ...cab,
+      driverPhotoUrl: store.profiles.find((owner) => owner.id === cab.ownerId)?.show_driver_photo && latestDocumentStatus(store.documents ?? [], cab.ownerId, null, 'selfie') === 'approved' ? 'demo-photo://selfie' : undefined,
+      vehiclePhotoUrl: latestDocumentStatus(store.documents ?? [], cab.ownerId, cab.id, 'vehicle_photo') === 'approved' ? 'demo-photo://vehicle' : undefined,
+    })) : available;
+    return withDemoPhotos.sort((a, b) => quote(a) - quote(b) || a.name.localeCompare(b.name));
+  }, [store, vehicleType, date, time, hours, kind, cloudUser?.id, demoMode]);
+  const cabsOpenForSearch = store.cabs.filter((cab) => cab.available && cab.reviewStatus === 'approved' && (cloudUser || store.profiles.find((item) => item.id === cab.ownerId)?.owner_review_status === 'approved') && (cloudUser || (requiredDocumentsApproved(store.documents ?? [], cab.ownerId, null, ['aadhaar', 'selfie']) && requiredDocumentsApproved(store.documents ?? [], cab.ownerId, cab.id, ['registration', 'insurance', 'pollution'], cab.registrationUpdatedAt))) && !cab.blocked && !store.blockedVehicles.includes(cab.id) && !store.blockedOwners.includes(cab.ownerId));
   const localFrom = cabsOpenForSearch.length ? formatRs(Math.min(...cabsOpenForSearch.map((cab) => cab.fullDay))) : '—';
   const outstationFrom = cabsOpenForSearch.length ? formatRs(Math.min(...cabsOpenForSearch.map((cab) => cab.perKm))) : '—';
   const amountFor = (cab: Cab) => kind === 'local' ? (Number(hours) >= 8 ? cab.fullDay : cab.hourly * Math.max(1, Number(hours) || 1)) : 0;
@@ -178,15 +224,15 @@ export default function App() {
   const refreshCloud = async () => {
     if (!cloudUser || !profile) return;
     try {
-      const { data: profileData, error: profileError } = await supabase!.from('profiles').select('id, role, full_name, phone, is_blocked, owner_review_status').eq('id', cloudUser.id).single();
+      const { data: profileData, error: profileError } = await supabase!.from('profiles').select('id, role, full_name, phone, is_blocked, owner_review_status, show_driver_photo').eq('id', cloudUser.id).single();
       if (profileError) throw profileError;
       if (profileData.is_blocked) {
         await supabase!.auth.signOut();
         throw new Error(t('blockedAccount'));
       }
       const account = profileData as Account;
-      const loaded = await loadCloudData(cloudUser.id, account.role, account.full_name, account.phone);
-      setStore((current) => ({ ...current, cabs: loaded.cabs, bookings: loaded.bookings, profiles: loaded.profiles, metrics: loaded.metrics }));
+      const loaded = await loadCloudData(cloudUser.id, account.role, account.full_name, account.phone, account.owner_review_status);
+      setStore((current) => ({ ...current, cabs: loaded.cabs, bookings: loaded.bookings, profiles: loaded.profiles, documents: loaded.documents, metrics: loaded.metrics }));
       setProfile(account);
       setRole(account.role);
       setSyncIssue(false);
@@ -269,12 +315,14 @@ export default function App() {
   };
   const addCab = async () => {
     if (!newName.trim()) { Alert.alert(t('enterVehicleName')); return; }
-    if (cloudUser && newRegistration.trim().replace(/[^a-z\d]/gi, '').length < 4) { Alert.alert(t('registrationRequired')); return; }
+    if (newRegistration.trim().replace(/[^a-z\d]/gi, '').length < 4) { Alert.alert(t('registrationRequired')); return; }
     const rates = [Number(newHourly), Number(newFullDay), Number(newPerKm), Number(newSeats)];
     if (rates.some((value) => !Number.isFinite(value) || value <= 0)) { Alert.alert(t('checkFaresSeats'), t('validFaresSeats')); return; }
     const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
     if ((newAvailabilityStart || newAvailabilityEnd) && (!timePattern.test(newAvailabilityStart) || !timePattern.test(newAvailabilityEnd) || newAvailabilityStart >= newAvailabilityEnd)) { Alert.alert(t('invalidAvailabilityHours')); return; }
-    const cab: Cab = { id: `cab-${Date.now()}`, ownerId: cloudUser?.id ?? 'owner-a', ownerName: profile?.full_name ?? 'Ramesh Kumar', phone: profile?.phone ?? '98765 43210', name: newName.trim(), type: newType, seats: Number(newSeats) || 4, available: !cloudUser, hourly: Number(newHourly) || 0, fullDay: Number(newFullDay) || 0, perKm: Number(newPerKm) || 0, registrationNumber: newRegistration.trim().toUpperCase(), reviewStatus: cloudUser ? 'pending' : 'approved', availabilityStart: newAvailabilityStart || null, availabilityEnd: newAvailabilityEnd || null };
+    const existingCab = editingCabId ? store.cabs.find((item) => item.id === editingCabId) : undefined;
+    const registrationChanged = Boolean(existingCab && (existingCab.registrationNumber ?? '').trim().toUpperCase() !== newRegistration.trim().toUpperCase());
+    const cab: Cab = { id: editingCabId ?? `cab-${Date.now()}`, ownerId: cloudUser?.id ?? demoOwnerId, ownerName: profile?.full_name ?? store.profiles.find((item) => item.id === demoOwnerId)?.full_name ?? 'Ramesh Kumar', phone: profile?.phone ?? '98765 43210', name: newName.trim(), type: newType, seats: Number(newSeats) || 4, available: Boolean(existingCab?.available && !registrationChanged), hourly: Number(newHourly) || 0, fullDay: Number(newFullDay) || 0, perKm: Number(newPerKm) || 0, registrationNumber: newRegistration.trim().toUpperCase(), reviewStatus: existingCab && !registrationChanged ? existingCab.reviewStatus ?? 'pending' : 'pending', registrationUpdatedAt: registrationChanged ? new Date().toISOString() : existingCab?.registrationUpdatedAt ?? new Date().toISOString(), availabilityStart: newAvailabilityStart || null, availabilityEnd: newAvailabilityEnd || null };
     if (cloudUser) {
       try {
         const details = { name: cab.name, type: cab.type, seats: cab.seats, hourly: cab.hourly, fullDay: cab.fullDay, perKm: cab.perKm, registrationNumber: cab.registrationNumber ?? '', availabilityStart: cab.availabilityStart ?? null, availabilityEnd: cab.availabilityEnd ?? null };
@@ -283,7 +331,7 @@ export default function App() {
         await refreshCloud();
       }
       catch (error) { Alert.alert(t('saveVehicleFailed'), error instanceof Error ? error.message : String(error)); return; }
-    } else if (editingCabId) setStore((s) => ({ ...s, cabs: s.cabs.map((v) => v.id === editingCabId ? { ...cab, id: editingCabId } : v) }));
+    } else if (editingCabId) setStore((s) => ({ ...s, cabs: s.cabs.map((v) => v.id === editingCabId ? cab : v) }));
     else setStore((s) => ({ ...s, cabs: [...s.cabs, cab] }));
     setNewName(''); setNewRegistration(''); setNewAvailabilityStart(''); setNewAvailabilityEnd(''); setEditingCabId(null); setPage('owner');
   };
@@ -292,6 +340,10 @@ export default function App() {
     setNewHourly(String(cab.hourly)); setNewFullDay(String(cab.fullDay)); setNewPerKm(String(cab.perKm)); setNewRegistration(cab.registrationNumber ?? ''); setNewAvailabilityStart(cab.availabilityStart?.slice(0, 5) ?? ''); setNewAvailabilityEnd(cab.availabilityEnd?.slice(0, 5) ?? ''); setPage('add');
   };
   const toggleAvailability = async (cabId: string, available: boolean) => {
+    const currentCab = store.cabs.find((item) => item.id === cabId);
+    if (available && currentCab && (!requiredDocumentsApproved(store.documents ?? [], currentCab.ownerId, null, ['aadhaar', 'selfie']) || !requiredDocumentsApproved(store.documents ?? [], currentCab.ownerId, cabId, ['registration', 'insurance', 'pollution'], currentCab.registrationUpdatedAt) || (cloudUser ? profile?.owner_review_status : store.profiles.find((item) => item.id === currentCab.ownerId)?.owner_review_status) !== 'approved' || currentCab.reviewStatus !== 'approved')) {
+      Alert.alert(t('documentsRequired')); return;
+    }
     if (cloudUser) {
       const cab = store.cabs.find((item) => item.id === cabId);
       try { await updateCloudAvailability(cabId, available, cab?.availabilityStart ?? null, cab?.availabilityEnd ?? null); await refreshCloud(); }
@@ -313,12 +365,78 @@ export default function App() {
     } else setStore((s) => ({ ...s, blockedVehicles: blocked ? [...s.blockedVehicles, cab.id] : s.blockedVehicles.filter((x) => x !== cab.id) }));
   };
   const reviewOwner = async (accountId: string, status: ReviewStatus) => {
+    if (!cloudUser) {
+      if (status === 'approved' && !requiredDocumentsApproved(store.documents ?? [], accountId, null, ['aadhaar', 'selfie'])) return;
+      setStore((s) => ({ ...s, profiles: s.profiles.map((item) => item.id === accountId ? { ...item, owner_review_status: status } : item), cabs: status === 'approved' ? s.cabs : s.cabs.map((cab) => cab.ownerId === accountId ? { ...cab, reviewStatus: 'pending', available: false } : cab) }));
+      return;
+    }
     try { await setCloudOwnerReviewStatus(accountId, status); await refreshCloud(); }
     catch (error) { Alert.alert(t('updateFailed'), error instanceof Error ? error.message : String(error)); }
   };
   const reviewVehicle = async (cab: Cab, status: ReviewStatus) => {
+    if (!cloudUser) {
+      if (status === 'approved' && (!requiredDocumentsApproved(store.documents ?? [], cab.ownerId, cab.id, ['registration', 'insurance', 'pollution'], cab.registrationUpdatedAt) || store.profiles.find((item) => item.id === cab.ownerId)?.owner_review_status !== 'approved')) return;
+      setStore((s) => ({ ...s, cabs: s.cabs.map((item) => item.id === cab.id ? { ...item, reviewStatus: status, available: false } : item) }));
+      return;
+    }
     try { await setCloudVehicleReviewStatus(cab.id, status); await refreshCloud(); }
     catch (error) { Alert.alert(t('updateFailed'), error instanceof Error ? error.message : String(error)); }
+  };
+  const reviewDocument = async (document: VerificationDocument, status: ReviewStatus, reason?: string) => {
+    if (!cloudUser) {
+      setStore((s) => ({ ...s,
+        documents: (s.documents ?? []).map((item) => item.id === document.id ? { ...item, status, rejectionReason: status === 'rejected' ? reason ?? t('reasonMismatch') : null } : item),
+        profiles: document.vehicleId === null ? s.profiles.map((item) => item.id === document.ownerId ? { ...item, owner_review_status: 'pending' } : item) : s.profiles,
+        cabs: document.type === 'vehicle_photo' ? s.cabs : s.cabs.map((cab) => (document.vehicleId === null ? cab.ownerId === document.ownerId : cab.id === document.vehicleId) ? { ...cab, reviewStatus: 'pending', available: false } : cab),
+      }));
+      return;
+    }
+    try { await reviewVerificationDocument(document.id, status, reason); await refreshCloud(); }
+    catch (error) { Alert.alert(t('updateFailed'), error instanceof Error ? error.message : String(error)); }
+  };
+  const showVerificationDocument = async (document: VerificationDocument) => {
+    if (!cloudUser) { Alert.alert(t(`document_${document.type}`), `${t('demoSampleDocument')}\n${t(`document_${document.status}`)}${document.expiresOn ? ` · ${document.expiresOn}` : ''}`); return; }
+    try { await Linking.openURL(await openVerificationDocument(document.storagePath)); }
+    catch (error) { Alert.alert(t('openFailed'), error instanceof Error ? error.message : String(error)); }
+  };
+  const toggleDriverPhoto = async (show: boolean) => {
+    if (!cloudUser) {
+      setStore((current) => ({ ...current, profiles: current.profiles.map((item) => item.id === demoOwnerId ? { ...item, show_driver_photo: show } : item) }));
+      return;
+    }
+    try { await setCloudDriverPhotoVisibility(cloudUser.id, show); await refreshCloud(); }
+    catch (error) { Alert.alert(t('updateFailed'), error instanceof Error ? error.message : String(error)); }
+  };
+  const uploadDocument = async (type: DocumentType, vehicleId: string | null) => {
+    const ownerId = cloudUser?.id ?? demoOwnerId;
+    const expiry = vehicleId && (type === 'insurance' || type === 'pollution') ? vehicleExpiryDates[vehicleId]?.[type] ?? '' : null;
+    if ((type === 'insurance' || type === 'pollution') && (!expiry || !/^\d{4}-\d{2}-\d{2}$/.test(expiry) || expiry < todayInIndia())) {
+      Alert.alert(t('checkDetails'), t('expiryRequired')); return;
+    }
+    if (!cloudUser) {
+      const document: VerificationDocument = { id: `demo-${Date.now()}`, ownerId, vehicleId, type, storagePath: 'demo://sample', status: 'pending', expiresOn: expiry, rejectionReason: null, createdAt: new Date().toISOString() };
+      setStore((s) => ({ ...s, documents: [document, ...(s.documents ?? [])], profiles: vehicleId || type === 'vehicle_photo' ? s.profiles : s.profiles.map((item) => item.id === ownerId ? { ...item, owner_review_status: 'pending' } : item), cabs: type === 'vehicle_photo' ? s.cabs : s.cabs.map((cab) => (vehicleId ? cab.id === vehicleId : cab.ownerId === ownerId) ? { ...cab, reviewStatus: 'pending', available: false } : cab) }));
+      Alert.alert(t('uploadReady'), t('demoSampleDocument'));
+      return;
+    }
+    try {
+      let file: { uri: string; name: string; mimeType: string } | null = null;
+      if (type === 'selfie') {
+        const photo = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.85 });
+        if (!photo.canceled) { const asset = photo.assets[0]; file = { uri: asset.uri, name: `selfie-${Date.now()}.jpg`, mimeType: asset.mimeType ?? 'image/jpeg' }; }
+      } else if (type === 'vehicle_photo') {
+        const photo = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.85 });
+        if (!photo.canceled) { const asset = photo.assets[0]; file = { uri: asset.uri, name: `vehicle-${Date.now()}.jpg`, mimeType: asset.mimeType ?? 'image/jpeg' }; }
+      } else {
+        const picked = await DocumentPicker.getDocumentAsync({ type: ['image/*', 'application/pdf'], copyToCacheDirectory: true, multiple: false });
+        if (!picked.canceled) { const asset = picked.assets[0]; file = { uri: asset.uri, name: asset.name, mimeType: asset.mimeType ?? 'application/octet-stream' }; }
+      }
+      if (!file) { Alert.alert(t('uploadCancelled')); return; }
+      if (!(type === 'vehicle_photo' ? ['image/jpeg', 'image/png', 'image/webp'] : ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']).includes(file.mimeType)) { Alert.alert(t('uploadFailed'), t('unsupportedDocument')); return; }
+      await uploadVerificationDocument({ ownerId, vehicleId, type, ...file, expiresOn: expiry });
+      await refreshCloud();
+      Alert.alert(t('uploadReady'));
+    } catch (error) { Alert.alert(t('uploadFailed'), error instanceof Error ? error.message : String(error)); }
   };
   const submitAuth = async () => {
     if (!supabase) { Alert.alert(t('backendMissing'), t('backendSetup')); return; }
@@ -380,13 +498,16 @@ export default function App() {
   } else if (page === 'bookings') {
     content = <>{header(t('bookings'), () => setPage('home'))}<CustomerBookingsContent bookings={store.bookings} hindi={hindi} t={t} onChangeStatus={changeBooking} onSearch={() => setPage('search')} rolePicker={rolePicker()} />{bottomNav('bookings')}</>;
   } else if (page === 'owner') {
-    const owned = store.cabs.filter((cab) => cab.ownerId === (cloudUser?.id ?? 'owner-a'));
+    const ownerId = cloudUser?.id ?? demoOwnerId;
+    const owned = store.cabs.filter((cab) => cab.ownerId === ownerId);
     const ownBookings = store.bookings.filter((booking) => owned.some((cab) => cab.id === booking.cabId));
-    content = <>{header(t('ownerPanel'))}<OwnerDashboardContent owned={owned} bookings={ownBookings} ownerName={profile?.full_name ?? ''} ownerReviewStatus={demoMode ? 'approved' : profile?.owner_review_status} pushState={demoMode ? 'unsupported' : pushState} focusBookingId={focusBookingId} onEnablePush={() => cloudUser && void enablePush(cloudUser.id)} hindi={hindi} t={t} rolePicker={rolePicker()} onAddVehicle={() => setPage('add')} onEditVehicle={editCab} onToggleAvailability={toggleAvailability} onChangeStatus={changeBooking} />{bottomNav('owner')}</>;
+    const ownerAccount = store.profiles.find((item) => item.id === ownerId);
+    const demoOwners = demoMode ? store.profiles.filter((item) => item.role === 'owner').map((item) => ({ id: item.id, name: item.full_name })) : undefined;
+    content = <>{header(t('ownerPanel'))}<OwnerDashboardContent owned={owned} bookings={ownBookings} ownerName={profile?.full_name ?? ownerAccount?.full_name ?? ''} ownerReviewStatus={cloudUser ? profile?.owner_review_status : ownerAccount?.owner_review_status} showDriverPhoto={cloudUser ? Boolean(profile?.show_driver_photo) : Boolean(ownerAccount?.show_driver_photo)} onToggleDriverPhoto={(show) => void toggleDriverPhoto(show)} documents={store.documents ?? []} vehicleExpiry={(id, type) => vehicleExpiryDates[id]?.[type] ?? ''} setVehicleExpiry={(id, type, value) => setVehicleExpiryDates((current) => ({ ...current, [id]: { insurance: current[id]?.insurance ?? '', pollution: current[id]?.pollution ?? '', [type]: value } }))} onUploadDocument={(type, vehicleId) => void uploadDocument(type, vehicleId)} demoOwners={demoOwners} demoOwnerId={demoOwnerId} onSelectDemoOwner={setDemoOwnerId} pushState={demoMode ? 'unsupported' : pushState} focusBookingId={focusBookingId} onEnablePush={() => cloudUser && void enablePush(cloudUser.id)} hindi={hindi} t={t} rolePicker={rolePicker()} onAddVehicle={() => setPage('add')} onEditVehicle={editCab} onToggleAvailability={toggleAvailability} onChangeStatus={changeBooking} />{bottomNav('owner')}</>;
   } else if (page === 'add') {
     content = <>{header(editingCabId ? t('editVehicle') : t('addVehicle'), () => { setEditingCabId(null); setNewName(''); setPage('owner'); })}<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}><VehicleFormContent hindi={hindi} t={t} newName={newName} setNewName={setNewName} newType={newType} setNewType={setNewType} newSeats={newSeats} setNewSeats={setNewSeats} newHourly={newHourly} setNewHourly={setNewHourly} newFullDay={newFullDay} setNewFullDay={setNewFullDay} newPerKm={newPerKm} setNewPerKm={setNewPerKm} registrationNumber={newRegistration} setRegistrationNumber={setNewRegistration} availabilityStart={newAvailabilityStart} setAvailabilityStart={setNewAvailabilityStart} availabilityEnd={newAvailabilityEnd} setAvailabilityEnd={setNewAvailabilityEnd} onSave={addCab} /></KeyboardAvoidingView></>;
   } else {
-    content = <>{header(t('dashboard'))}<AdminScreen store={store} live={Boolean(cloudUser)} hindi={hindi} t={t} rolePicker={rolePicker()} onToggleAccount={toggleAdminAccount} onToggleVehicle={toggleAdminVehicle} onReviewOwner={reviewOwner} onReviewVehicle={reviewVehicle} onChangeStatus={changeBooking} />{bottomNav('admin')}</>;
+    content = <>{header(t('dashboard'))}<AdminScreen store={store} live={Boolean(cloudUser)} hindi={hindi} t={t} rolePicker={rolePicker()} onToggleAccount={toggleAdminAccount} onToggleVehicle={toggleAdminVehicle} onReviewOwner={reviewOwner} onReviewVehicle={reviewVehicle} onReviewDocument={reviewDocument} onOpenDocument={showVerificationDocument} onChangeStatus={changeBooking} />{bottomNav('admin')}</>;
   }
 
   function bottomNav(active: 'home' | 'results' | 'bookings' | 'owner' | 'admin') {
@@ -395,4 +516,34 @@ export default function App() {
 
   const androidTopInset = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 8 : 0;
   return <SafeAreaView style={[styles.safe, { paddingTop: androidTopInset }]}><StatusBar barStyle="dark-content" backgroundColor={C.bg} />{cloudLoading && cloudUser ? <View style={styles.loading}><Text style={styles.logoMark}>MS</Text><Text style={styles.headerTitle}>{t('loadingRides')}</Text></View> : ready ? <View style={{ flex: 1 }}>{syncIssue && cloudUser && <Pressable accessibilityRole="button" onPress={() => refreshCloud().catch(() => undefined)} style={[styles.summaryPanel, { margin: 8, borderColor: C.red, borderWidth: 1 }]}><Text style={styles.summaryTitle}>{t('retryLoad')}</Text><Text style={styles.confirmationEditText}>{t('retryBooking')}</Text></Pressable>}{content}</View> : <View style={styles.loading}><Text style={styles.logoMark}>MS</Text><Text style={styles.headerTitle}>{t('brand')}</Text></View>}</SafeAreaView>;
+}
+
+function requiredDocumentsApproved(documents: VerificationDocument[], ownerId: string, vehicleId: string | null, types: DocumentType[], registrationUpdatedAt?: string) {
+  const today = todayInIndia();
+  return types.every((type) => {
+    const latest = documents.filter((doc) => doc.ownerId === ownerId && doc.vehicleId === vehicleId && doc.type === type).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    const registrationCurrent = type !== 'registration' || !registrationUpdatedAt || Boolean(latest?.createdAt && latest.createdAt >= registrationUpdatedAt);
+    return latest?.status === 'approved' && registrationCurrent && (!latest.expiresOn || latest.expiresOn >= today);
+  });
+}
+
+function latestDocumentStatus(documents: VerificationDocument[], ownerId: string, vehicleId: string | null, type: DocumentType) {
+  return documents.filter((document) => document.ownerId === ownerId && document.vehicleId === vehicleId && document.type === type)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))[0]?.status;
+}
+
+function restoreDemoStore(saved: Partial<Store>): Store {
+  const savedCabs = saved.cabs ?? INITIAL.cabs;
+  const cabs = savedCabs.map((cab) => {
+    const seed = INITIAL.cabs.find((item) => item.id === cab.id);
+    return { ...seed, ...cab, reviewStatus: cab.reviewStatus ?? seed?.reviewStatus ?? 'pending', registrationNumber: cab.registrationNumber ?? seed?.registrationNumber ?? '' } as Cab;
+  });
+  for (const seeded of INITIAL.cabs) if (!cabs.some((cab) => cab.id === seeded.id)) cabs.push(seeded);
+  return {
+    ...INITIAL,
+    ...saved,
+    cabs,
+    profiles: saved.profiles?.length ? saved.profiles : INITIAL.profiles,
+    documents: saved.documents?.length ? saved.documents : INITIAL.documents,
+  };
 }
