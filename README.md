@@ -25,7 +25,7 @@ The booking flow does not use a map. Pickup search uses Photon place suggestions
 ## Connect Supabase
 
 1. Add your Supabase project URL and publishable key to `.env.local`. Never put a service-role key in the app.
-2. In the Supabase SQL Editor, run `supabase/schema.sql` once, then run the files in `supabase/migrations/` in timestamp order. The migrations add booking statuses, owner/vehicle approvals, private verification-document storage, expiry, availability, history, and pilot metrics. Existing owners and vehicles remain unavailable until they provide and receive approval for the required documents.
+2. For a new project, validate the tracked schema and migrations in an isolated Supabase project, then deploy through the authenticated Supabase CLI so migration history is recorded. For an existing project initialized manually from `supabase/schema.sql`, first adopt and compare that baseline into migration history; never blindly replay the schema or paste pending migrations into Production SQL Editor. See the [EP-04 rollout research](docs/research/2026-10-05-ep04-research.md).
 3. In Supabase Authentication settings, enable sign-up with phone numbers and turn off phone confirmation. No Twilio or SMS setup is needed when confirmation is off. Phone numbers will not be checked during sign-up.
 
 ## Sign in or create an account
@@ -34,21 +34,15 @@ The booking flow does not use a map. Pickup search uses Photon place suggestions
 - To create an account, tap **New here? Create an account**. Enter your name, choose **Customer** or **Cab owner**, enter your phone number and a password with at least 6 characters, then tap **Create account**.
 - To try the app without an account, tap **Open demo**.
 
-To create the first admin, sign up another account then run the following in the SQL Editor, replacing the phone number with the admin's full `+91...` number:
-
-   ```sql
-   update public.profiles
-   set role = 'admin', owner_review_status = null
-   where id = (select id from auth.users where phone = '+91XXXXXXXXXX');
-   ```
+Provision the first admin through the reviewed operator procedure after confirming the account's auth/profile ID. Admin provisioning is privileged and should be audited; do not put a real phone number into source control or issue the update before the target schema has been validated.
 
 For an EAS/store build, configure `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` as EAS environment variables too.
 
-The SQL defines profiles, vehicles, bookings, cash-only payment, customer/owner/admin policies, owner and vehicle review, booking expiry, status history, device push tokens, and privacy-limited pilot metrics. The first admin role must be granted from the SQL editor. A new cloud signup is set to customer or owner from the role chosen in the app; admin cannot be self-selected. Without phone confirmation, people can sign up using a phone number they do not own.
+The SQL defines profiles, vehicles, bookings, cash-only payment, customer/owner/admin policies, owner and vehicle review, booking expiry, status history, device push tokens, and privacy-limited pilot metrics. A new cloud signup is set to customer or owner from the role chosen in the app; admin cannot be self-selected. Without phone confirmation, people can sign up using a phone number they do not own.
 
-To make the first administrator, update a customer profile to `role = 'admin'`. Drivers submit a private Aadhaar identity file and a selfie; each vehicle needs a registration certificate, current insurance, and current PUC certificate. Admins review each latest file, choose a reason when requesting a replacement, approve the driver, approve each vehicle, and then the owner turns availability on. Replacing a reviewed file or changing a registration number sends the affected approval back to review; after a registration change, the RC must be uploaded again. Expired insurance or PUC files immediately remove that vehicle from search and booking until replaced and reapproved.
+Drivers submit a private Aadhaar identity file and a selfie; each vehicle needs a registration certificate, current insurance, and current PUC certificate. Admins review each latest file, choose a reason when requesting a replacement, approve the driver, approve each vehicle, and then the owner turns availability on. Replacing a reviewed file or changing a registration number sends the affected approval back to review; after a registration change, the RC must be uploaded again. Expired insurance or PUC files immediately remove that vehicle from search and booking until replaced and reapproved.
 
-Verification files are stored in a private Supabase Storage bucket. Admin file links expire after five minutes; filenames and Aadhaar numbers are not copied into the database. The app does not yet define automatic evidence retention/deletion, so decide an operational retention period before collecting real Aadhaar files.
+Verification files are intended for a private Supabase Storage bucket. Admin file links expire after five minutes; filenames and Aadhaar numbers are not copied into the database. A retention migration and server-side purge worker are implemented locally but are not deployed or scheduled. Review the proposed policy with privacy/legal counsel, validate the migration in staging, and configure the worker schedule before collecting real Aadhaar files. See [retention worker setup](supabase/functions/purge-verification-files/README.md).
 
 ## MVP decisions / follow-up
 

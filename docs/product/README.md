@@ -33,4 +33,4 @@ The source PRD cited by the earlier gap review (`Local Cab Booking App — Produ
 
 ## Current delivery caveat
 
-The worktree contains the driver/vehicle verification and photo implementation plus its migrations. There is no linked Supabase project in this repository, so remote migration history and live RLS behavior are unknown. Review and validate migrations in a disposable Supabase project before applying them to a live project. See the migration inventory in [current application map](current-state.md).
+The worktree contains the driver/vehicle verification and photo implementation plus its migrations. The local app environment was found to point at a dashboard project labeled Production, but the Supabase CLI is not authenticated and the project's migration ledger is empty. Read-only inspection found the EP-04 schema and Storage bucket absent. Review [EP-04 research](../research/2026-10-05-ep04-research.md) before attempting rollout; do not treat migration files as deployed. See [current application map](current-state.md).

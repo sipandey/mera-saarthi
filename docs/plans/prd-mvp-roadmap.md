@@ -21,8 +21,8 @@ This roadmap is the current product scope. The earlier gap review references an 
 | RQ-03 Honest fare | Local rate/estimate is explicit; outstation displays saved per-km rate and driver-confirmed final fare | EP-02 · MS-05 | Implemented in code/migrations |
 | RQ-04 Reliable request | Server-confirmed idempotent booking; no conflicting slot; pending requests expire after 15 minutes; valid transitions and history | EP-03 · MS-01, MS-03, MS-09 | Code/migrations exist; cloud and Android integration remain unverified |
 | RQ-05 Release contact safely | Customer/owner phone access only after booking acceptance; system dialer handles the call | EP-03 · MS-01 | Implemented in base schema/app; validate on Android and against cloud RLS |
-| RQ-06 Approve real supply | Required driver and vehicle files are privately stored and individually reviewed; owner and vehicle approvals are separate; latest valid evidence gates search/booking | EP-04 · MS-02, MS-12 | Code/migrations exist; migration apply, Storage policy, and security review remain pending |
-| RQ-07 Improve listing trust without blocking supply | Owner can opt in to show approved selfie; optional vehicle photo gets its own admin review; neither photo is an eligibility requirement | EP-04 · MS-13 | Code/migration exists; cloud policy and signed-link behavior unverified |
+| RQ-06 Approve real supply | Required driver and vehicle files are privately stored and individually reviewed; owner and vehicle approvals are separate; latest valid evidence gates search/booking | EP-04 · MS-02, MS-12 | Client and local retention worker implemented; configured Production project lacks verification schema/Storage and migration history; policy review and isolated security validation remain open |
+| RQ-07 Improve listing trust without blocking supply | Owner can opt in to show approved selfie; optional vehicle photo gets its own admin review; neither photo is an eligibility requirement | EP-04 · MS-13 | Client supports opt-in, review, and vehicle-photo withdrawal; Production photo migration/policies are absent and signed-link flow remains unverified |
 | RQ-08 Run the stand | Availability windows, requests, account/vehicle blocks, document review, booking state, and weekly counts | EP-05 · MS-06, MS-08, MS-10 | Mobile admin/owner flows implemented; support contact and operational procedures are missing |
 | RQ-09 Keep service practical on pilot network | Manual pickup fallback, server-confirmed request, guarded retry, visible refresh recovery, optional best-effort push | EP-06 · MS-04, MS-09, MS-16 | Partial: core paths exist; no clear full offline mode; push deployment/device validation outstanding |
 | RQ-10 Learn before expanding | Privacy-limited weekly counts support a small town pilot; no unvalidated expansion features | EP-07 · MS-10, MS-11 | Event functions exist; no agreed success thresholds or field data yet |
@@ -39,7 +39,7 @@ The plan is milestone-based; delivery dates and pilot thresholds have not been a
 - Validate RLS, document upload/review, customer display-photo opt-in, signed-link access, stale/expired documents, owner blocks, vehicle blocks, and attempted API bypasses using customer, pending owner, approved owner, blocked user, and admin accounts.
 - Exercise request, accept/reject/cancel/expire/complete transitions and overlapping-slot concurrency; confirm phone access only after acceptance.
 - Validate pickup fallback, fares, booking confirmation/retry, expiry, and dialer on the supported Android build.
-- Provision the initial admin, set Supabase Auth phone confirmation deliberately (currently disabled to avoid SMS), define human account recovery, stand support contact, and document retention/deletion.
+- Provision the initial admin, set Supabase Auth phone confirmation deliberately (currently disabled to avoid SMS), define human account recovery and stand support contact, and approve/deploy the evidence retention worker.
 - If launch depends on background booking alerts, configure EAS project ID, FCM V1, Edge Function secrets/deployment, Database Webhook, and verify delivery/tap routing on an installed build. Push remains best-effort.
 
 **Exit:** all P0 stories pass on a disposable cloud project and Android device; owner/vehicle booking gates are server-enforced; operators can process a failed/rejected verification and a failed booking without claiming success prematurely. Product owner sets minimum conversion/response thresholds before recruiting beyond the first 10–20 owners.
@@ -51,7 +51,7 @@ The plan is milestone-based; delivery dates and pilot thresholds have not been a
 - Recruit a small group of local owners and customers; review weekly search → results → booking, response, expiry, cancellation, and completion counts.
 - Validate availability-window semantics and stale-availability handling with operators in the actual town/timezone.
 - Add the agreed help/support contact and incident handling. Observe network failures and improve recovery only from pilot evidence.
-- Define administrative owner identity/RC checking procedure, evidence retention and deletion operation, account recovery, and photo moderation policy.
+- Define administrative owner identity/RC checking procedure, account recovery, and photo moderation policy; monitor the deployed evidence purge schedule.
 - Review opt-in rates, rejected documents, photo consent, support reasons, owner response time, and completion feedback; keep metrics free of sensitive trip data.
 
 **Exit:** the product owner has reviewed real pilot evidence and documented which bottleneck justifies the next feature. Do not assume growth from demo behavior.
@@ -67,7 +67,7 @@ The plan is milestone-based; delivery dates and pilot thresholds have not been a
 - In scope: Android-first one-town booking, cash-only, phone/password without SMS, bilingual core flow, manual owner/vehicle review, approved display photos, basic admin, and privacy-limited pilot counts.
 - Not a release requirement: web admin, card/UPI payment, route map, live tracking, chat, ratings, multi-town support, automated pricing, or customer/driver phone-number verification.
 - Schema, RLS, Storage policies, authentication, and notification configuration need maintainer review. App-only gating must never replace database enforcement.
-- Do not infer cloud deployment from a migration filename. The project is not linked in this repository, so only remote inspection can establish applied state.
+- Do not infer cloud deployment from a migration filename. The 5 Oct 2026 read-only Production snapshot is documented in [EP-04 research](../research/2026-10-05-ep04-research.md); re-inspect the target project before any future rollout.
 
 ## Product decisions retained
 

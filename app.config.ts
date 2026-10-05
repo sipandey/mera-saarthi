@@ -14,6 +14,11 @@ const config: ExpoConfig = {
   },
   plugins: [
     ['expo-location', { locationWhenInUsePermission: 'Use your location to set the pickup place.' }],
+    ['expo-image-picker', {
+      cameraPermission: 'Allow Mera Saarthi to take an optional driver selfie for identity review.',
+      photosPermission: 'Allow Mera Saarthi to choose an optional vehicle photo and verification documents.',
+      microphonePermission: false,
+    }],
     ['expo-notifications', { color: '#15803D', defaultChannel: 'booking-requests' }],
   ],
   extra: {

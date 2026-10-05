@@ -4,6 +4,7 @@ import { BookingCard } from '../components/BookingCard';
 import { ChoiceChip, FormField, PrimaryButton } from '../components/Primitives';
 import { styles, VEHICLES, C } from '../theme';
 import { formatRs, todayInIndia } from '../utils';
+import { latestVerificationDocument, requiredVerificationDocumentsApproved } from '../verification';
 import type { Booking, Cab, DocumentType, VerificationDocument, VehicleType } from '../types';
 
 type Translate = (key: string) => string;
@@ -26,11 +27,13 @@ export function OwnerDashboardContent({
   onEnablePush,
   documents,
   onUploadDocument,
+  onWithdrawVehiclePhoto,
   onToggleDriverPhoto,
   vehicleExpiry,
   setVehicleExpiry,
   demoOwners,
   demoOwnerId,
+  currentOwnerId,
   onSelectDemoOwner,
 }: {
   owned: Cab[];
@@ -50,11 +53,13 @@ export function OwnerDashboardContent({
   onEnablePush: () => void;
   documents: VerificationDocument[];
   onUploadDocument: (type: DocumentType, vehicleId: string | null) => void;
+  onWithdrawVehiclePhoto: (document: VerificationDocument) => void;
   onToggleDriverPhoto: (show: boolean) => void;
   vehicleExpiry: (vehicleId: string, type: 'insurance' | 'pollution') => string;
   setVehicleExpiry: (vehicleId: string, type: 'insurance' | 'pollution', value: string) => void;
   demoOwners?: { id: string; name: string }[];
   demoOwnerId?: string;
+  currentOwnerId: string;
   onSelectDemoOwner?: (id: string) => void;
 }) {
   const orderedBookings = focusBookingId
@@ -73,19 +78,19 @@ export function OwnerDashboardContent({
       <View style={styles.panel}>
         <Text style={styles.sectionTitle}>{t('driverVerification')}</Text>
         <Text style={styles.helper}>{t('verificationPrivacy')}</Text>
-        {(['aadhaar', 'selfie'] as DocumentType[]).map((type) => <EvidenceRow key={type} type={type} document={latestDocument(documents, type, null)} t={t} onUpload={() => onUploadDocument(type, null)} />)}
+        {(['aadhaar', 'selfie'] as DocumentType[]).map((type) => <EvidenceRow key={type} type={type} document={latestDocument(documents, currentOwnerId, type, null)} t={t} onUpload={() => onUploadDocument(type, null)} />)}
         <View style={styles.photoConsentRow}><View style={{ flex: 1 }}><Text style={styles.cabMeta}>{t('showDriverPhoto')}</Text><Text style={styles.bookingHelper}>{t('driverPhotoConsent')}</Text></View><Switch accessibilityLabel={t('showDriverPhoto')} value={showDriverPhoto} onValueChange={onToggleDriverPhoto} trackColor={{ true: C.green }} /></View>
       </View>
       {ownerReviewStatus === 'approved' && <View style={styles.summaryPanel}><Text style={styles.summaryTitle}>{t(pushState === 'ready' ? 'pushReady' : pushState === 'idle' ? 'pushNotEnabled' : pushState === 'setting_up' ? 'pushSettingUp' : pushState === 'permission_denied' ? 'pushPermissionDenied' : pushState === 'unsupported' ? 'pushUnsupported' : pushState === 'needs_project' ? 'pushNeedsProject' : 'pushFailed')}</Text>{['idle', 'permission_denied', 'error'].includes(pushState) && <Pressable accessibilityRole="button" onPress={onEnablePush}><Text style={styles.confirmationEditText}>{t('enableAlerts')}</Text></Pressable>}</View>}
       <View style={styles.sectionLine}><Text style={styles.sectionTitle}>{t('myVehicle')}</Text><Pressable accessibilityRole="button" onPress={onAddVehicle}><Text style={styles.addLink}>＋ {t('addVehicle')}</Text></Pressable></View>
-      {owned.map((cab) => { const lastUpdated = cab.availabilityUpdatedAt ? new Date(cab.availabilityUpdatedAt).getTime() : 0; const stale = lastUpdated > 0 && Date.now() - lastUpdated > 86400000; const evidenceReady = ['registration', 'insurance', 'pollution'].every((type) => { const doc = latestDocument(documents, type as DocumentType, cab.id); const registrationCurrent = type !== 'registration' || !cab.registrationUpdatedAt || Boolean(doc?.createdAt && doc.createdAt >= cab.registrationUpdatedAt); return doc?.status === 'approved' && registrationCurrent && (!doc.expiresOn || doc.expiresOn >= todayInIndia()); }); const identityReady = ['aadhaar', 'selfie'].every((type) => { const doc = latestDocument(documents, type as DocumentType, null); return doc?.status === 'approved' && (!doc.expiresOn || doc.expiresOn >= todayInIndia()); }); return <View key={cab.id} style={styles.ownerCab}>
+      {owned.map((cab) => { const lastUpdated = cab.availabilityUpdatedAt ? new Date(cab.availabilityUpdatedAt).getTime() : 0; const stale = lastUpdated > 0 && Date.now() - lastUpdated > 86400000; const evidenceReady = requiredVerificationDocumentsApproved(documents, cab.ownerId, cab.id, ['registration', 'insurance', 'pollution'], cab.registrationUpdatedAt); const identityReady = requiredVerificationDocumentsApproved(documents, cab.ownerId, null, ['aadhaar', 'selfie']); return <View key={cab.id} style={styles.ownerCab}>
         <View style={styles.ownerCabTop}><View style={styles.carIcon}><Text style={styles.carIconText}>🚕</Text></View><View style={{ flex: 1 }}><Text style={styles.cabName}>{cab.name}</Text><Text style={styles.cabMeta}>{t(`vehicle${cab.type}`)} · {cab.seats} {t('seats')}</Text><Text style={styles.cabMeta}>{t('vehicleRegistration')}: {cab.registrationNumber || '—'}</Text><Text style={styles.availabilityLabel}>{cab.reviewStatus === 'approved' ? (cab.available ? t('cabAvailable') : t('cabUnavailable')) : cab.reviewStatus === 'rejected' ? t('vehicleApprovalRejected') : t('vehicleApprovalPending')}</Text>{(cab.availabilityStart && cab.availabilityEnd) && <Text style={styles.cabMeta}>{cab.availabilityStart.slice(0, 5)}–{cab.availabilityEnd.slice(0, 5)}</Text>}{cab.availabilityUpdatedAt && <Text style={styles.cabMeta}>{t('lastUpdated')} {cab.availabilityUpdatedAt.slice(0, 16).replace('T', ' ')}</Text>}</View><Switch accessibilityLabel={t('availability')} value={cab.available} disabled={cab.available ? false : cab.reviewStatus !== 'approved' || ownerReviewStatus !== 'approved' || !evidenceReady || !identityReady} onValueChange={(value) => onToggleAvailability(cab.id, value)} trackColor={{ true: C.green }} />
         </View>
         <View style={styles.rule} />
         <View style={styles.ratesRow}><Text style={styles.ownerRate}>{t('hourly')} {formatRs(cab.hourly)}</Text><Text style={styles.ownerRate}>{t('fullDay')} {formatRs(cab.fullDay)}</Text><Text style={styles.ownerRate}>{t('perKm')} {formatRs(cab.perKm)}</Text></View>
         <Pressable accessibilityRole="button" onPress={() => onEditVehicle(cab)}><Text style={styles.addLink}>{t('editVehicle')}  ✎</Text></Pressable>
         <View style={styles.rule} /><Text style={styles.sectionTitle}>{t('vehicleVerification')}</Text>
-        {(['registration', 'insurance', 'pollution', 'vehicle_photo'] as DocumentType[]).map((type) => { const document = latestDocument(documents, type, cab.id); const registrationChanged = type === 'registration' && Boolean(cab.registrationUpdatedAt && document?.createdAt && document.createdAt < cab.registrationUpdatedAt); return <EvidenceRow key={type} type={type} document={document} needsReplacement={registrationChanged} t={t} onUpload={() => onUploadDocument(type, cab.id)} />; })}
+        {(['registration', 'insurance', 'pollution', 'vehicle_photo'] as DocumentType[]).map((type) => { const document = latestDocument(documents, cab.ownerId, type, cab.id); const registrationChanged = type === 'registration' && Boolean(cab.registrationUpdatedAt && document?.createdAt && document.createdAt < cab.registrationUpdatedAt); return <EvidenceRow key={type} type={type} document={document} needsReplacement={registrationChanged} t={t} onUpload={() => onUploadDocument(type, cab.id)} onWithdraw={type === 'vehicle_photo' && document && !document.displayWithdrawnAt && !document.purgedAt ? () => onWithdrawVehiclePhoto(document) : undefined} />; })}
         <FormField label={t('insuranceExpiry')} value={vehicleExpiry(cab.id, 'insurance')} onChange={(value) => setVehicleExpiry(cab.id, 'insurance', value)} placeholder="YYYY-MM-DD" />
         <FormField label={t('pollutionExpiry')} value={vehicleExpiry(cab.id, 'pollution')} onChange={(value) => setVehicleExpiry(cab.id, 'pollution', value)} placeholder="YYYY-MM-DD" />
         {stale && <Text style={styles.bookingHelper}>{t('availabilityStale')}</Text>}
@@ -98,14 +103,15 @@ export function OwnerDashboardContent({
   );
 }
 
-function latestDocument(documents: VerificationDocument[], type: DocumentType, vehicleId: string | null) {
-  return documents.filter((doc) => doc.type === type && doc.vehicleId === vehicleId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+function latestDocument(documents: VerificationDocument[], ownerId: string, type: DocumentType, vehicleId: string | null) {
+  return latestVerificationDocument(documents, ownerId, vehicleId, type);
 }
 
-function EvidenceRow({ type, document, needsReplacement = false, t, onUpload }: { type: DocumentType; document?: VerificationDocument; needsReplacement?: boolean; t: Translate; onUpload: () => void }) {
-  const status = needsReplacement ? 'document_stale' : document?.expiresOn && document.expiresOn < todayInIndia() ? 'expired' : document?.status ?? 'missing';
+function EvidenceRow({ type, document, needsReplacement = false, t, onUpload, onWithdraw }: { type: DocumentType; document?: VerificationDocument; needsReplacement?: boolean; t: Translate; onUpload: () => void; onWithdraw?: () => void }) {
+  const status = document?.displayWithdrawnAt ? 'document_removed' : needsReplacement ? 'document_stale' : document?.expiresOn && document.expiresOn < todayInIndia() ? 'expired' : document?.status ?? 'missing';
   return <View style={styles.evidenceRow}>
-    <View style={{ flex: 1 }}><Text style={styles.cabMeta}>{t(`document_${type}`)}</Text><Text style={styles.bookingHelper}>{t(status === 'missing' ? 'documentMissing' : status === 'document_stale' ? status : `document_${status}`)}{document?.expiresOn ? ` · ${document.expiresOn}` : ''}{document?.rejectionReason ? ` · ${document.rejectionReason}` : ''}</Text></View>
+    <View style={{ flex: 1 }}><Text style={styles.cabMeta}>{t(`document_${type}`)}</Text><Text style={styles.bookingHelper}>{t(status === 'missing' ? 'documentMissing' : status === 'document_stale' || status === 'document_removed' ? status : `document_${status}`)}{document?.purgedAt ? ` · ${t('document_file_purged')}` : ''}{document?.expiresOn ? ` · ${document.expiresOn}` : ''}{document?.rejectionReason ? ` · ${document.rejectionReason}` : ''}</Text></View>
+    {onWithdraw && <Pressable accessibilityRole="button" onPress={onWithdraw} style={styles.adminAction}><Text style={styles.adminActionText}>{t('removePhoto')}</Text></Pressable>}
     <Pressable accessibilityRole="button" onPress={onUpload} style={styles.adminAction}><Text style={styles.adminActionText}>{t(status === 'missing' ? 'uploadDocument' : 'replaceDocument')}</Text></Pressable>
   </View>;
 }

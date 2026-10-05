@@ -1,0 +1,3 @@
+[functions.purge-verification-files]
+# This scheduled worker authenticates itself with VERIFICATION_RETENTION_SECRET.
+verify_jwt = false

@@ -119,7 +119,7 @@ For combined states, the story has two independent parts: **Implementation** des
 ### MS-02 — Gate every listing and booking on owner and vehicle approval
 
 - **Requirement / priority:** RQ-04, RQ-05, RQ-06; P0.
-- **Implementation:** Implemented in code/migration source. **Rollout:** Local migration files are not proof of application; RLS/trigger review pending.
+- **Implementation:** Implemented in app/source and hardened with a shared latest-evidence/currentness helper. **Rollout:** Configured Production project lacks verification schema and migration history; RLS/trigger review, migration deployment, and isolated API-bypass validation pending.
 - **User story:** As a stand admin, I want to approve a driver and each vehicle separately; as a customer, I must never book unapproved or blocked supply.
 - **Acceptance criteria:** Owner needs explicit approval and no account block; vehicle needs explicit approval and no vehicle block; registration must be valid; required current latest evidence must be approved; changed registration invalidates old RC approval; expired/replaced required documents make supply ineligible; app search and database authorization enforce the same gate; existing records fail closed.
 - **Demo path:** Admin review with Suresh/Amit/Meena; verify they do not appear as eligible until blockers are cleared. Block/unblock a fixture and observe search change.
@@ -129,20 +129,20 @@ For combined states, the story has two independent parts: **Implementation** des
 ### MS-12 — Upload, replace, and review required evidence
 
 - **Requirement / priority:** RQ-06; P0.
-- **Implementation:** Implemented in app/migration source. **Rollout:** Storage policy, document access, retention, and actual-device picker/camera remain unverified.
+- **Implementation:** Implemented in app/migration source; ImagePicker permissions are purpose-limited; a private-file retention queue/worker is implemented locally. **Rollout:** Production Storage policy, migration/function deployment, Vault/Cron setup, retention-policy approval, and actual-device picker/camera remain unverified.
 - **User story:** As an owner, I want to submit and replace required identity/vehicle evidence; as an admin, I want to inspect a private file and approve or reject it with a reason.
 - **Acceptance criteria:** Driver evidence is Aadhaar file + selfie; each vehicle evidence set is RC + current insurance + current PUC; review is per evidence item and per owner/vehicle; rejection reason is recorded; replacement creates a new version and returns the affected decision to review; evidence stays in a private bucket; only authorized owner/admin can access it; Aadhaar UID is not copied to text metadata.
 - **Demo path:** Owner/Admin loop with synthetic pending/rejected/approved fixture items and a replacement. Demo is metadata/state simulation, not proof of actual file transfer.
 - **Code:** `src/screens/OwnerScreens.tsx`, `src/screens/AdminScreen.tsx`, `src/cloudData.ts`, verification migration.
-- **Release check:** Verify upload size/type, private Storage policies, signed-link expiry, unauthorized access denial, and evidence retention/deletion procedure before using real Aadhaar.
+- **Release check:** Verify upload size/type, private Storage policies, signed-link expiry, unauthorized access denial, file purge + metadata retention behavior, and account-closure deletion procedure before using real Aadhaar.
 
 ### MS-13 — Offer optional, approved display photos with consent
 
 - **Requirement / priority:** RQ-07; P1 (trust improvement; does not gate pilot eligibility).
-- **Implementation:** Implemented in app/migration source. **Rollout:** Signed URL permissions and display behavior pending cloud/device verification.
+- **Implementation:** Implemented in app/migration source. **Rollout:** Production photo migration is absent; signed URL permissions and display behavior need cloud/device verification.
 - **User story:** As a driver, I want to opt in to showing my approved selfie; as an owner, I may add a vehicle photo; as a customer, I want to see approved photos on eligible listings.
-- **Acceptance criteria:** Driver selfie remains evidence-required but is displayed only after explicit owner opt-in and admin approval; vehicle photo upload is optional and reviewed independently; neither photo affects booking eligibility; rejected/pending photos are not displayed; customer URLs are short-lived and generated only for otherwise bookable supply; fallback UI works when no approved photo is available.
-- **Demo path:** Owner toggles selfie display; upload/review an optional vehicle photo; customer results show synthetic approved-photo placeholders for Ramesh and fallback for other fixtures.
+- **Acceptance criteria:** Driver selfie remains evidence-required but is displayed only after explicit owner opt-in and admin approval; vehicle photo upload is optional and reviewed independently; owner can withdraw a vehicle photo; neither photo affects booking eligibility; rejected/pending/withdrawn/purged photos are not displayed; customer URLs are short-lived and generated only for otherwise bookable supply; fallback UI works when no approved photo is available.
+- **Demo path:** Owner toggles selfie display; upload/review/withdraw an optional vehicle photo; customer results show synthetic approved-photo placeholders for Ramesh and fallback after withdrawal or for other fixtures.
 - **Code:** `src/screens/OwnerScreens.tsx`, `src/components/CabCard.tsx`, `src/cloudData.ts`, `src/types.ts`, optional-photo migration.
 - **Privacy rule:** Aadhaar, RC, insurance, and PUC are never customer listing images.
 
@@ -201,7 +201,7 @@ For combined states, the story has two independent parts: **Implementation** des
 ## Shared release checklist for P0 stories
 
 1. Confirm the source-of-truth files in [product handoff](../product/README.md) and reconcile any newly supplied original PRD.
-2. Review `supabase/schema.sql` plus every migration in timestamp order. The local repository currently contains four migrations; remote applied state is unknown and must be read from the target project before applying anything.
+2. Review `supabase/schema.sql` plus every migration in timestamp order. The 5 Oct 2026 Production snapshot had no migration ledger and lacked the four local migration changes; re-inspect the target immediately before any rollout and reconcile the manually applied baseline first.
 3. Apply to a disposable Supabase project and verify policies/triggers using customer, pending owner, approved owner, blocked owner/vehicle, and admin identities. Include direct API attempts, not just UI paths.
 4. Validate evidence replacement/rejection, registration change, expiry, signed URL access, and that optional photos do not alter eligibility.
 5. Validate booking idempotency, overlap under concurrent requests, all transitions, lazy/scheduled expiry behavior, contact gating, and history.

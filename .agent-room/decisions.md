@@ -16,6 +16,24 @@ have to re-derive it from scratch by reading git history.
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-05 — purge verification bytes separately from approval metadata
+
+**Decision:** Keep approved status/expiry/reviewer metadata so active booking gates remain valid, but purge private Storage bytes 30 days after approval, rejection, replacement, expiry, or photo-consent withdrawal as applicable. Use a service-only queue and Edge Function that deletes through the Storage API; an opted-in selfie remains available until consent is withdrawn. An owner can withdraw an optional vehicle photo, which stops display immediately and starts its purge window.
+**Why:** Deleting the evidence row would unexpectedly invalidate all active supply; deleting only Storage metadata in SQL can orphan billable provider bytes. A retryable queue separates file deletion from the booking eligibility record.
+**Rejected:** Indefinite raw-file retention or deleting document rows at purge time, because the first is unnecessary retention and the second breaks current approvals.
+
+### 2026-10-05 — share verification evidence ordering across client flows
+
+**Decision:** Use one helper for latest verification evidence and approval readiness in owner, admin, and cloud client code. Match the database ordering exactly: newest `created_at`, then greatest id. Scope identity evidence by owner ID even in demo mode.
+**Why:** Different tie-break rules can show conflicting readiness when timestamps tie, and unscoped demo lookups can show another driver's identity evidence.
+**Rejected:** Letting each screen sort its own subset, because review and eligibility need one consistent definition.
+
+### 2026-10-05 — keep image picker permissions purpose-limited
+
+**Decision:** Explain camera access as optional driver-selfie capture, photo-library access as optional listing/evidence selection, and disable microphone permission for the still-image flow.
+**Why:** The production app should ask for only the device access that EP-04 actually uses and explain the purpose at the point of system permission.
+**Rejected:** Accepting library defaults, which include platform permission text and can request microphone access that this workflow does not use.
+
 ### 2026-10-03 — display approved driver and optional vehicle photos privately
 
 **Decision:** Reuse the approved driver selfie as the customer-facing driver photo only when the owner opts in. Let owners upload one optional vehicle photo per vehicle. Keep both files in the private evidence bucket, require admin approval before display, and issue short-lived signed links only to customers viewing currently bookable vehicles. Vehicle-photo review never resets approval or affects booking eligibility.

@@ -21,6 +21,12 @@ Append a new entry every time:
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-05 — scope owner evidence lookups by owner
+
+**What happened:** The demo owner dashboard chose the newest Aadhaar/selfie across all fixture owners because identity documents share a null vehicle ID. A different driver's evidence could appear in the selected owner's checklist.
+**Root cause:** The screen filtered by document type and vehicle ID but omitted owner ID.
+**Avoid:** Include owner ID in every latest-evidence query, including driver-level evidence where `vehicle_id` is null.
+
 ### 2026-10-03 — keep demo admin review controls visible
 
 **What happened:** Demo handlers supported local document and approval changes, but the admin screen hid the approve/reject controls whenever `live` was false.
