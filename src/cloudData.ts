@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import type { BookingStatus, DocumentType, PilotMetric, ReviewStatus, VerificationDocument } from './types';
-import { todayInIndia } from './utils';
+import { compareVerificationDocuments, requiredVerificationDocumentsApproved } from './verification';
 
 export type CloudRole = 'customer' | 'owner' | 'admin';
 
@@ -28,16 +28,17 @@ export async function loadCloudData(userId: string, role: CloudRole, profileName
   const profileById = new Map(profiles.map((p) => [p.id, p]));
   const documents: VerificationDocument[] = ((documentsResult.data ?? []) as any[]).map((d) => ({
     id: d.id, ownerId: d.owner_id, vehicleId: d.vehicle_id, type: d.document_type,
-    storagePath: d.storage_path, status: d.status, expiresOn: d.expires_on,
+    storagePath: d.storage_path ?? '', status: d.status, expiresOn: d.expires_on,
     rejectionReason: d.rejection_reason, createdAt: d.created_at,
+    purgedAt: d.purged_at ?? null, displayWithdrawnAt: d.display_withdrawn_at ?? null,
   }));
   const displayPhotos = new Map<string, string>();
   if (role === 'customer') {
-    const latestDisplayDocuments = documents.filter((document) => document.status === 'approved' && (document.type === 'selfie' || document.type === 'vehicle_photo'))
+    const latestDisplayDocuments = documents.filter((document) => document.status === 'approved' && !document.purgedAt && !document.displayWithdrawnAt && (document.type === 'selfie' || document.type === 'vehicle_photo'))
       .reduce((latest, document) => {
         const key = `${document.type}:${document.type === 'selfie' ? document.ownerId : document.vehicleId}`;
         const previous = latest.get(key);
-        if (!previous || document.createdAt > previous.createdAt || (document.createdAt === previous.createdAt && document.id > previous.id)) latest.set(key, document);
+        if (!previous || compareVerificationDocuments(document, previous) > 0) latest.set(key, document);
         return latest;
       }, new Map<string, VerificationDocument>());
     await Promise.all([...latestDisplayDocuments.entries()].map(async ([key, document]) => {
@@ -45,11 +46,8 @@ export async function loadCloudData(userId: string, role: CloudRole, profileName
       if (!error && data?.signedUrl) displayPhotos.set(key, data.signedUrl);
     }));
   }
-  const documentsApproved = (ownerId: string, vehicleId: string | null, types: DocumentType[], registrationUpdatedAt?: string) => types.every((type) => {
-    const latest = documents.filter((d) => d.ownerId === ownerId && d.vehicleId === vehicleId && d.type === type).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-    const registrationCurrent = type !== 'registration' || !registrationUpdatedAt || Boolean(latest?.createdAt && latest.createdAt >= registrationUpdatedAt);
-    return latest?.status === 'approved' && registrationCurrent && (!latest.expiresOn || latest.expiresOn >= todayInIndia());
-  });
+  const documentsApproved = (ownerId: string, vehicleId: string | null, types: DocumentType[], registrationUpdatedAt?: string) =>
+    requiredVerificationDocumentsApproved(documents, ownerId, vehicleId, types, registrationUpdatedAt);
   const cabs = ((carsResult.data ?? []) as any[]).map((v) => {
     const owner = profileById.get(v.owner_id);
     const ownerApproved = owner?.owner_review_status === 'approved' || (role === 'owner' && v.owner_id === userId && ownerReviewStatus === 'approved');
@@ -218,6 +216,12 @@ export async function setCloudOwnerReviewStatus(id: string, status: ReviewStatus
 export async function setCloudDriverPhotoVisibility(ownerId: string, show: boolean) {
   if (!supabase) throw new Error('Supabase is not configured.');
   const { error } = await supabase.from('profiles').update({ show_driver_photo: show }).eq('id', ownerId);
+  fail(error);
+}
+
+export async function withdrawCloudVehiclePhoto(documentId: string) {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { error } = await supabase.rpc('withdraw_optional_vehicle_photo', { p_document_id: documentId });
   fail(error);
 }
 

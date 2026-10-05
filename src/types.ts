@@ -7,6 +7,7 @@ export type VerificationDocument = {
   id: string; ownerId: string; vehicleId: string | null; type: DocumentType;
   storagePath: string; status: ReviewStatus; expiresOn: string | null;
   rejectionReason: string | null; createdAt: string;
+  purgedAt?: string | null; displayWithdrawnAt?: string | null;
 };
 export type BookingStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'expired' | 'completed';
 export type Cab = {
