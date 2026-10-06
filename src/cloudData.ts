@@ -268,3 +268,9 @@ export async function setCloudVehicleAvailability(id: string, available: boolean
   const { error } = await supabase.from('vehicles').update({ is_available: available }).eq('id', id);
   fail(error);
 }
+
+export async function closeCloudAccount(): Promise<void> {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { error } = await supabase.rpc('request_account_closure');
+  fail(error);
+}

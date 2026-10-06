@@ -324,6 +324,23 @@ export const COPY = {
   perHourUnit: { en: '/hour', hi: '/घंटा' },
   perKmUnit: { en: '/km', hi: '/किमी' },
   pendingCountCaption: { en: '{{count}} booking requests waiting', hi: '{{count}} नई बुकिंग का इंतज़ार' },
+  helpAndPrivacy: { en: 'Help & Privacy', hi: 'मदद और प्राइवेसी' },
+  help: { en: 'Help', hi: 'मदद' },
+  appVersion: { en: 'App version', hi: 'ऐप वर्शन' },
+  contactSupport: { en: 'Contact support', hi: 'सपोर्ट से संपर्क करें' },
+  supportDesc: { en: 'For booking help, account questions, or stand coordination:', hi: 'बुकिंग सहायता या खाते के सवालों के लिए:' },
+  privacyPolicy: { en: 'Privacy Policy', hi: 'प्राइवेसी पॉलिसी' },
+  privacyPolicyDesc: { en: 'Read how your identity evidence and trip data are handled.', hi: 'जानें कि आपका डेटा और दस्तावेज़ कैसे सुरक्षित रखे जाते हैं।' },
+  accountDeletion: { en: 'Account Deletion', hi: 'खाता हटाना' },
+  accountDeletionDesc: { en: 'Permanently close your account and queue verification files for deletion.', hi: 'अपना खाता हमेशा के लिए बंद करें और दस्तावेज़ हटाएं।' },
+  deleteAccount: { en: 'Delete account', hi: 'खाता हटाएं' },
+  deleteAccountWarning: { en: 'Closing your account will remove your login access and unlist any vehicles. Your verification documents will be queued for immediate deletion. Past booking records will be anonymized.', hi: 'खाता हटाने से आपका लॉगिन बंद हो जाएगा और गाड़ियाँ हट जाएंगी। सत्यापन दस्तावेज़ हटाने के लिए कतारबद्ध किए जाएंगे। पुरानी बुकिंग से आपकी व्यक्तिगत जानकारी हटा दी जाएगी।' },
+  confirmDeleteAccount: { en: 'Are you sure you want to permanently delete your account?', hi: 'क्या आप वाकई अपना खाता हमेशा के लिए हटाना चाहते हैं?' },
+  deleteAccountConfirmButton: { en: 'Yes, delete my account', hi: 'हाँ, मेरा खाता हटाएं' },
+  deletingAccount: { en: 'Closing account...', hi: 'खाता हटाया जा रहा है...' },
+  accountDeleted: { en: 'Your account has been closed successfully.', hi: 'आपका खाता सफलतापूर्वक बंद कर दिया गया है।' },
+  accountDeletionFailed: { en: 'Could not close account. Please contact support.', hi: 'खाता बंद नहीं हो सका। कृपया सपोर्ट से संपर्क करें।' },
+  openInBrowser: { en: 'Open in browser', hi: 'ब्राउज़र में खोलें' },
 } as const;
 
 export type CopyKey = keyof typeof COPY;

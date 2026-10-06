@@ -1,11 +1,11 @@
 ---
 title: EP-08 market readiness and controlled pilot launch
 date: 2026-10-06
-status: ready-for-implementation
+status: in-progress
 research_doc: ../research/2026-10-06-market-readiness-audit.md
-branch: feature/market-readiness-audit
+branch: feature/ep08-market-readiness
 phases_total: 8
-phases_completed: 0
+phases_completed: 4
 ---
 
 # EP-08 — market readiness and controlled pilot launch
