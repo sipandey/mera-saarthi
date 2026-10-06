@@ -18,8 +18,8 @@ have to re-derive it from scratch by reading git history.
 
 ### 2026-10-06 — trigger Android EAS production builds from main
 
-**Decision:** Use GitHub Actions on pushes to `main` to queue the existing EAS `production` Android build profile. Authenticate through the repository Actions secret `EXPO_TOKEN`, submit to EAS without waiting for cloud completion, and do not submit automatically to Google Play.
-**Why:** The app already has an EAS project ID and production profile. EAS cloud builds avoid requiring an Android SDK/keystore on GitHub runners, while an explicit Expo access-token secret keeps authentication out of source control.
+**Decision:** Use GitHub Actions on pushes to `main` to queue the existing EAS `production` Android build profile. Run Node.js 22, authenticate through the repository Actions secret `EXPO_TOKEN`, submit to EAS without waiting for cloud completion, and do not submit automatically to Google Play.
+**Why:** The app already has an EAS project ID and production profile. EAS cloud builds avoid requiring an Android SDK/keystore on GitHub runners, while Node.js 22 satisfies the current EAS CLI dependency engine requirement and an explicit Expo access-token secret keeps authentication out of source control.
 **Rejected:** Building an APK locally on a GitHub runner, because Android toolchain setup is unnecessary when the app is already configured for EAS; auto-submitting to Play, because a build trigger does not authorize a store release.
 
 ### 2026-10-06 — prefill vehicle document expiry from existing latest evidence
