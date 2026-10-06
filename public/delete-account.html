@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account Deletion Request — Mera Saarthi</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1f2937; margin: 0; padding: 2rem 1rem; background: #f9fafb; }
+    .container { max-width: 700px; margin: 0 auto; background: #ffffff; padding: 2.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    h1 { color: #dc2626; margin-top: 0; }
+    h2 { color: #374151; font-size: 1.25rem; margin-top: 1.5rem; }
+    p, li { font-size: 1rem; color: #4b5563; }
+    .step-box { background: #f3f4f6; border-left: 4px solid #15803d; padding: 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; }
+    .form-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 1.5rem; margin-top: 2rem; }
+    input[type="text"], input[type="tel"], textarea { width: 100%; padding: 0.6rem; margin: 0.5rem 0 1rem 0; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; }
+    button { background: #dc2626; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 1rem; }
+    button:hover { background: #b91c1c; }
+    footer { margin-top: 3rem; font-size: 0.875rem; color: #6b7280; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Delete Your Mera Saarthi Account</h1>
+    <p>In accordance with Google Play User Data policies and the Digital Personal Data Protection Act, you may request the deletion of your Mera Saarthi account and associated personal data at any time.</p>
+
+    <h2>Method 1: Direct In-App Deletion (Instant)</h2>
+    <div class="step-box">
+      <ol>
+        <li>Open the <strong>Mera Saarthi</strong> app on your Android smartphone.</li>
+        <li>Tap the <strong>ℹ️ (Info)</strong> icon in the top header.</li>
+        <li>Scroll down to the <strong>Account Closure & Deletion</strong> section.</li>
+        <li>Tap <strong>Delete Account & Anonymize History</strong> and confirm.</li>
+      </ol>
+      <p><em>Your account, active listings, vehicle documents, and personal details will be immediately removed and scheduled for evidence purging.</em></p>
+    </div>
+
+    <h2>Method 2: Web Deletion Request</h2>
+    <p>If you have uninstalled the app or cannot access your phone, submit a deletion request below using your registered mobile number:</p>
+
+    <div class="form-box">
+      <form action="mailto:support@merasaarthi.in?subject=Account%20Deletion%20Request" method="POST" enctype="text/plain">
+        <label for="phone"><strong>Registered Phone Number (with Country Code):</strong></label>
+        <input type="tel" id="phone" name="phone" placeholder="+91 98765 43210" required>
+
+        <label for="reason"><strong>Reason for Closure (Optional):</strong></label>
+        <textarea id="reason" name="reason" rows="3" placeholder="Optional feedback on why you are deleting your account"></textarea>
+
+        <button type="submit">Submit Account Deletion Request</button>
+      </form>
+    </div>
+
+    <h2>What Happens to Your Data?</h2>
+    <ul>
+      <li><strong>Immediate Removal:</strong> Your profile, name, phone number, and vehicle listings are immediately deactivated.</li>
+      <li><strong>Document Purging:</strong> All uploaded Aadhaar, selfie, RC, and insurance image bytes are permanently deleted from cloud storage.</li>
+      <li><strong>Booking History:</strong> Operational booking records are permanently anonymized to retain aggregate trip metrics for taxi stand accounting.</li>
+    </ul>
+
+    <footer>
+      &copy; 2026 Mera Saarthi. For urgent support, email <a href="mailto:support@merasaarthi.in">support@merasaarthi.in</a>.
+    </footer>
+  </div>
+</body>
+</html>
