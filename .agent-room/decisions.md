@@ -16,6 +16,18 @@ have to re-derive it from scratch by reading git history.
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-06 — automate retention purges with pg_cron and push dispatch with pg_net
+
+**Decision:** Deploy `purge-verification-files` and `send-booking-request` as Supabase Edge Functions with secret authentication via custom request headers. Isolate service configuration and function secrets in a private PostgreSQL schema (`private.service_secrets`) inaccessible to public/authenticated clients. Use `pg_cron` to schedule the daily retention worker invocation at 03:00 IST (21:30 UTC), and use `pg_net` in an asynchronous database trigger on `bookings` (INSERT) to dispatch push alerts without delaying or risking transaction rollback.
+**Why:** Verification evidence must be purged within 30 days without manual operator toil or billable storage leaks. Push notifications are best-effort, so asynchronous HTTP dispatch ensures database integrity and booking creation are never blocked by push network failures or Expo rate limits.
+**Rejected:** Running cron jobs externally or in client loops; hardcoding function URLs and secrets in source or migration files; synchronous triggers that would fail booking creation when the push endpoint is slow or unreachable.
+
+### 2026-10-06 — surface help, privacy, and account closure in a universal header modal
+
+**Decision:** Provide a dedicated Help & Privacy screen accessible via the header across all user roles (Customer, Owner, Admin) and unauthenticated states. Include build version/code, support contact, external privacy and account deletion links, and an in-app account closure flow.
+**Why:** Google Play compliance requires easily discoverable privacy policies and in-app account deletion, and pilot users need an obvious contact route regardless of their current active screen.
+**Rejected:** Burying help/deletion inside individual role screens or behind submenus, because users who are blocked or encountering errors cannot reach role-specific screens.
+
 ### 2026-10-06 — complete market readiness before adding marketplace features
 
 **Decision:** Make EP-08 the next epic: signed Android builds, privacy/help/account closure, reproducible Supabase migrations, initial-admin provisioning, retention operations, staging/device validation, and a Play closed pilot. Use an idempotent server-side account-closure workflow that anonymizes retained operational booking data before relational/Auth identity is removed.

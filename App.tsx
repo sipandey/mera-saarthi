@@ -15,7 +15,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { loadCloudData, createCloudBooking, setCloudBookingStatus, saveCloudVehicle, editCloudVehicle, updateCloudAvailability, setCloudAccountBlocked, setCloudOwnerReviewStatus, setCloudDriverPhotoVisibility, withdrawCloudVehiclePhoto, setCloudVehicleReviewStatus, setCloudVehicleBlocked, saveCloudPushToken, removeCloudPushToken, trackPilotEvent, uploadVerificationDocument, openVerificationDocument, reviewVerificationDocument } from './src/cloudData';
+import { loadCloudData, createCloudBooking, setCloudBookingStatus, saveCloudVehicle, editCloudVehicle, updateCloudAvailability, setCloudAccountBlocked, setCloudOwnerReviewStatus, setCloudDriverPhotoVisibility, withdrawCloudVehiclePhoto, setCloudVehicleReviewStatus, setCloudVehicleBlocked, saveCloudPushToken, removeCloudPushToken, trackPilotEvent, uploadVerificationDocument, openVerificationDocument, reviewVerificationDocument, closeCloudAccount } from './src/cloudData';
 import { supabase, supabaseReady } from './src/supabase';
 import { C, styles } from './src/theme';
 import { translate, type CopyKey } from './src/i18n';
@@ -27,6 +27,7 @@ import { BottomNavigation } from './src/components/BottomNavigation';
 import { CustomerBookingsContent, CustomerHomeContent, CustomerSearchContent, SearchResultsContent } from './src/screens/CustomerScreens';
 import { OwnerDashboardContent, VehicleFormContent } from './src/screens/OwnerScreens';
 import { AdminScreen } from './src/screens/AdminScreen';
+import { HelpPrivacyScreen } from './src/screens/HelpPrivacyScreen';
 import { registerOwnerPushNotifications } from './src/pushNotifications';
 import { latestVerificationDocument, requiredVerificationDocumentsApproved } from './src/verification';
 
@@ -95,7 +96,8 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [role, setRole] = useState<Role>('customer');
   const [hindi, setHindi] = useState(true);
-  const [page, setPage] = useState<'auth' | 'home' | 'search' | 'results' | 'confirm' | 'bookings' | 'owner' | 'add' | 'admin'>('auth');
+  const [page, setPage] = useState<'auth' | 'home' | 'search' | 'results' | 'confirm' | 'bookings' | 'owner' | 'add' | 'admin' | 'help'>('auth');
+  const [returnPage, setReturnPage] = useState<'auth' | 'home' | 'search' | 'results' | 'confirm' | 'bookings' | 'owner' | 'add' | 'admin'>('home');
   const [cloudUser, setCloudUser] = useState<{ id: string; phone?: string } | null>(null);
   const [profile, setProfile] = useState<Account | null>(null);
   const [cloudLoading, setCloudLoading] = useState(false);
@@ -489,13 +491,61 @@ export default function App() {
     }
     await supabase?.auth.signOut();
   };
-  const header = (title: string, back?: () => void) => <AppHeader title={title} back={back} signedIn={Boolean(cloudUser)} hindi={hindi} onSignOut={signOut} onToggleLanguage={() => setHindi(!hindi)} t={t} />;
+  const header = (title: string, back?: () => void) => (
+    <AppHeader
+      title={title}
+      back={back}
+      signedIn={Boolean(cloudUser)}
+      hindi={hindi}
+      onSignOut={signOut}
+      onToggleLanguage={() => setHindi(!hindi)}
+      onOpenHelp={() => {
+        if (page !== 'help') {
+          setReturnPage(page === 'add' || page === 'confirm' ? 'home' : (page as any));
+          setPage('help');
+        }
+      }}
+      t={t}
+    />
+  );
   const rolePicker = () => demoMode && !cloudUser ? <RolePicker role={role} t={t} onPick={(value) => { setRole(value); setPage(value === 'customer' ? 'home' : value === 'owner' ? 'owner' : 'admin'); }} /> : null;
   const field = (label: string, value: string, onChange: (text: string) => void, placeholder = '', keyboardType: 'default' | 'numeric' = 'default', secureTextEntry = false) => <FormField label={label} value={value} onChange={onChange} placeholder={placeholder} keyboardType={keyboardType === 'numeric' ? 'numeric' : 'default'} secureTextEntry={secureTextEntry} />;
   const primary = (label: string, onPress: () => void) => <PrimaryButton label={label} onPress={onPress} />;
 
   let content: React.ReactNode;
-  if (page === 'auth' && !demoMode && !cloudUser) {
+  if (page === 'help') {
+    content = (
+      <>
+        {header(t('helpAndPrivacy'), () => setPage(returnPage))}
+        <HelpPrivacyScreen
+          hindi={hindi}
+          t={t}
+          signedIn={Boolean(cloudUser)}
+          onBack={() => setPage(returnPage)}
+          onDeleteAccount={async () => {
+            if (cloudUser) {
+              try {
+                await closeCloudAccount();
+              } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : t('accountDeletionFailed');
+                Alert.alert(t('accountDeletion'), msg);
+                return;
+              }
+              await signOut();
+              setPage('auth');
+              Alert.alert(t('accountDeletion'), t('accountDeleted'));
+            } else {
+              await AsyncStorage.removeItem(KEY);
+              setStore(INITIAL);
+              setDemoMode(false);
+              setPage('auth');
+              Alert.alert(t('accountDeletion'), t('accountDeleted'));
+            }
+          }}
+        />
+      </>
+    );
+  } else if (page === 'auth' && !demoMode && !cloudUser) {
     content = <>{header(t('brand'))}<ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.hero}><View style={styles.heroCopy}><Text style={styles.heroEyebrow}>{t('authEyebrow')}</Text><Text style={styles.heroTitle}>{authMode === 'signup' ? t('createAccount') : t('welcomeBack')}</Text><Text style={styles.heroNote}>{t('tagline')}</Text></View><Text style={styles.heroEmoji}>🚕</Text></View>
       <View style={styles.panel}>

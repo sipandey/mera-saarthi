@@ -29,6 +29,7 @@ For combined states, the story has two independent parts: **Implementation** des
 | EP-05 Stand operations | Owners manage supply; admins review, block, and observe pilot activity | RQ-08, RQ-10 | MS-06, MS-08, MS-10 |
 | EP-06 Connectivity and notifications | Search/request recovery and optional push work under real network/device conditions | RQ-09 | MS-04, MS-09, MS-16 |
 | EP-07 Learn and expand deliberately | Pilot measures outcomes before investment in expansion | RQ-10 | MS-10, MS-11 |
+| EP-08 Market readiness and launch | Release configuration, privacy/help surface, account closure, reproducible migrations, and staging validation | RQ-01, RQ-06, RQ-08 | MS-17, MS-18, MS-19, MS-20, MS-21, MS-22 |
 
 ## EP-01 — Access and onboarding
 
@@ -197,6 +198,49 @@ For combined states, the story has two independent parts: **Implementation** des
 - **User story:** As a stand operator, I may need a larger review surface if measured queue volume makes mobile administration too slow.
 - **Acceptance criteria before starting:** Pilot evidence identifies mobile review as a real bottleneck; product owner defines roles/audit/access needs; web design reuses server-enforced policies and does not weaken evidence privacy; scope is approved.
 - **Demo path:** None. Do not represent the mobile admin as a responsive web console.
+
+## EP-08 — Market readiness and controlled pilot launch
+
+### MS-17 — Release toolchain and signed builds
+
+- **Requirement / priority:** RQ-01; P0.
+- **Implementation:** Implemented. `eas.json` profiles (development, preview APK, production AAB) and `app.config.ts` legal/support environment bindings configured.
+- **Rollout:** Completed. EAS project configured (@sipandey/mera-saarthi, project ID 5128596b-dc54-4eff-975e-73d3f6a17ab9), Android keystore provisioned, and preview APK build generated (Build #75c7004d-e66c-4925-a173-ba5dde7f8b6f).
+- **Code:** `eas.json`, `app.config.ts`, `package.json`.
+
+### MS-18 — Privacy, support, and help surface
+
+- **Requirement / priority:** RQ-01, RQ-08; P0.
+- **Implementation:** Implemented. Universal Help & Privacy screen accessible via `AppHeader` across all roles; displays app version/build, support contact actions, external privacy policy and web deletion links.
+- **Rollout:** Deployment of live privacy and deletion web resources pending.
+- **Code:** `src/screens/HelpPrivacyScreen.tsx`, `src/components/Primitives.tsx`, `src/i18n.ts`, `App.tsx`.
+
+### MS-19 — Account closure and data anonymization
+
+- **Requirement / priority:** RQ-01, RQ-06; P0.
+- **Implementation:** Implemented. In-app deletion flow in `HelpPrivacyScreen.tsx`, `closeCloudAccount()` RPC client call, and migration `20261006000100_account_closure_and_anonymization.sql` with foreign key relaxation, purge queue enrollment, audit record, and personal snapshot anonymization.
+- **Rollout:** Database migration execution and Auth admin deletion in staging pending.
+- **Code:** `src/screens/HelpPrivacyScreen.tsx`, `src/cloudData.ts`, `App.tsx`, `supabase/migrations/20261006000100_account_closure_and_anonymization.sql`.
+
+### MS-20 — Reproducible database, integrity hardening, and initial admin
+
+- **Requirement / priority:** RQ-04, RQ-06, RQ-08; P0.
+- **Implementation:** Implemented. Baseline migration `20260930000100_initial_schema.sql` copies base schema into migration history; `20261006000200_operational_integrity_hardening.sql` enforces normalized registration uniqueness (P0-2), server-side availability hours check (P0-3), acceptance-time eligibility recheck (P0-4); and `20261006000300_initial_admin_bootstrap.sql` adds safe service-role initial admin promoter.
+- **Rollout:** Completed. All 11 migrations deployed and remote migration ledger reconciled. Initial admin 918130380606 promoted and verified with fail-close protection against duplicate promotions.
+- **Code:** `supabase/migrations/20260930000100_initial_schema.sql`, `supabase/migrations/20261006000200_operational_integrity_hardening.sql`, `supabase/migrations/20261006000300_initial_admin_bootstrap.sql`, `supabase/migrations/20261006000500_bootstrap_initial_admin_fix.sql`.
+
+### MS-21 — Evidence retention and push operations
+
+- **Requirement / priority:** RQ-06, RQ-09; P0/P1.
+- **Implementation:** Implemented. Edge Functions `purge-verification-files` and `send-booking-request` deployed (`--no-verify-jwt`). Migration `20261006000400_retention_cron_and_booking_webhook.sql` provisions `pg_net`, `pg_cron`, isolated `private.service_secrets` schema, asynchronous `trg_booking_inserted_push` trigger, and daily `daily-verification-purge` cron job (03:00 IST). End-to-end cron invocation verified live with 200 OK purge execution.
+- **Rollout:** Completed on remote project `pgmbbtuphpfcjrswptzs`. Edge function secrets and database service secrets configured and operational.
+- **Code:** `supabase/functions/purge-verification-files/`, `supabase/functions/send-booking-request/`, `supabase/migrations/20261006000400_retention_cron_and_booking_webhook.sql`.
+
+### MS-22 — Release validation and Play closed pilot
+
+- **Requirement / priority:** RQ-01, RQ-10; P0.
+- **Implementation:** In progress. `eas-cli` installed, `eas.json` profiles configured, preview APK generated.
+- **Rollout:** Execute release scenario matrix on physical Android hardware using preview APK build, then build production AAB for Play Console closed track.
 
 ## Shared release checklist for P0 stories
 

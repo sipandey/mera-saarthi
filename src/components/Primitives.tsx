@@ -12,6 +12,7 @@ export function AppHeader({
   hindi,
   onSignOut,
   onToggleLanguage,
+  onOpenHelp,
   t,
 }: {
   title: string;
@@ -20,12 +21,18 @@ export function AppHeader({
   hindi: boolean;
   onSignOut: () => void;
   onToggleLanguage: () => void;
+  onOpenHelp?: () => void;
   t: Translate;
 }) {
   return (
     <View style={styles.header}>
       {back ? <Pressable accessibilityRole="button" accessibilityLabel={t('back')} onPress={back} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable> : <Text style={styles.logoMark}>MS</Text>}
       <View style={{ flex: 1 }}><Text style={styles.headerTitle}>{title}</Text><Text style={styles.headerSub}>{t('tagline')}</Text></View>
+      {onOpenHelp && (
+        <Pressable accessibilityRole="button" accessibilityLabel={t('helpAndPrivacy')} onPress={onOpenHelp} style={styles.lang}>
+          <Text style={styles.langText}>ℹ️</Text>
+        </Pressable>
+      )}
       {signedIn && <Pressable accessibilityRole="button" accessibilityLabel={t('signOut')} onPress={onSignOut} style={styles.lang}><Text style={styles.langText}>{t('signOut')}</Text></Pressable>}
       <Pressable accessibilityRole="button" accessibilityLabel={t('switchToEnglish')} onPress={onToggleLanguage} style={styles.lang}><Text style={styles.langText}>{t('language')}</Text></Pressable>
     </View>

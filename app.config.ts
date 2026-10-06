@@ -24,7 +24,11 @@ const config: ExpoConfig = {
   extra: {
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '',
-    eas: { projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? '' },
+    eas: { projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? '5128596b-dc54-4eff-975e-73d3f6a17ab9' },
+    privacyPolicyUrl: process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? 'https://merasaarthi.in/privacy',
+    accountDeletionUrl: process.env.EXPO_PUBLIC_ACCOUNT_DELETION_URL ?? 'https://merasaarthi.in/delete-account',
+    supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? 'support@merasaarthi.in',
+    supportPhone: process.env.EXPO_PUBLIC_SUPPORT_PHONE ?? '',
   },
 };
 
