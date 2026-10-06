@@ -239,8 +239,9 @@ For combined states, the story has two independent parts: **Implementation** des
 ### MS-22 — Release validation and Play closed pilot
 
 - **Requirement / priority:** RQ-01, RQ-10; P0.
-- **Implementation:** In progress. `eas-cli` installed, `eas.json` profiles configured, preview APK generated.
-- **Rollout:** Execute release scenario matrix on physical Android hardware using preview APK build, then build production AAB for Play Console closed track.
+- **Implementation:** Implemented. `eas-cli` configured with remote version management, preview APK and production AAB signed builds generated, Google Play release dossier documented in `docs/product/google-play-release-dossier.md`, and static web compliance pages created in `public/privacy.html` and `public/delete-account.html`.
+- **Rollout:** Preview APK (Build `#75c7004d-e66c-4925-a173-ba5dde7f8b6f`) and Production AAB (Build `#30166531-fb76-48c4-b863-c045d2ed1f09`) successfully compiled on EAS. Ready for Play Console closed testing track upload and physical pilot cohort rollout.
+- **Code:** `docs/product/google-play-release-dossier.md`, `public/privacy.html`, `public/delete-account.html`, `eas.json`.
 
 ## Shared release checklist for P0 stories
 
