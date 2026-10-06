@@ -1,7 +1,7 @@
 # Current application map
 
 **Snapshot:** 6 Oct 2026. Describes the working tree, including local driver/vehicle verification and photo changes.
-**Code is not proof of deployment:** read-only inspection on 5 Oct 2026 found the configured dashboard project labeled Production, but the app repo has no authenticated CLI link or migration ledger.
+**Remote check:** On 6 Oct 2026, authenticated Supabase CLI inspection found the configured Production ledger through `20261006000600`, an enabled booking push trigger, and deployed `send-booking-request` version 2. A separate `mera-saarthi-staging` project in Mumbai also has the baseline plus 11 subsequent checked-in migrations applied through `20261006000600`; its staging-configured Android release APK launches on the Pixel 7 API 35 emulator and staging Auth rejects synthetic invalid credentials. Production already had the effective `service_role` access required by the booking function; migration `20261006000600` now records the explicit function permissions in both environments. Staging `send-booking-request` is deployed from checked-in source with a private webhook secret and DB trigger configuration; a synthetic nonexistent-vehicle event returns HTTP 200 with a skipped result. End-to-end owner push delivery remains unverified. The production migration changed database grants/history only; no production records were changed.
 
 ## User-visible areas
 
@@ -62,21 +62,27 @@ The database validates transitions, snapshots fare/vehicle/owner details, mainta
 | Domain types | `src/types.ts` | Roles, cabs, booking statuses, documents, store |
 | Cloud client and transformations | `src/cloudData.ts` | Supabase reads/mutations, Storage uploads and signed links, lifecycle RPCs, pilot events |
 | Base relational schema | `supabase/schema.sql` | Run once on a fresh project before timestamped migrations |
-| Ordered incremental schema/security changes | `supabase/migrations/*.sql` | Five local migrations at this snapshot; review/apply in timestamp order |
+| Ordered incremental schema/security changes | `supabase/migrations/*.sql` | Eleven local migrations at this snapshot; review/apply in timestamp order |
 | Raw evidence retention worker | `supabase/functions/purge-verification-files/` | Deletes eligible private files through Storage API; deploy, secret, schedule, and monitoring remain operator setup |
-| Booking notifications | `src/pushNotifications.ts`, `supabase/functions/send-booking-request/index.ts` | Expo token registration + secret-protected DB webhook target; requires external EAS/FCM/Supabase setup |
+| Booking notifications | `src/pushNotifications.ts`, `supabase/functions/send-booking-request/index.ts` | Production has Expo token registration, enabled `pg_net` trigger and deployed Edge Function; EAS FCM V1 credential is present. Staging trigger and function pass a synthetic lookup/skip request; authenticated delivery and physical-device validation remain pending |
 | Place lookup | `src/components/LocationPicker.tsx` | Photon public service for pickup and outstation destination suggestions; internet-dependent and without a production SLA. Manual text remains valid; no coordinates or route are stored. |
 | Local persistence | AsyncStorage in `App.tsx` | Demo data only; cloud records are Supabase-backed |
 
-### Local migrations at this snapshot
+### Migrations at this snapshot
 
 1. `20261001000100_booking_lifecycle_statuses.sql`
 2. `20261001000200_pilot_booking_workflows.sql`
 3. `20261003000100_driver_vehicle_verification_documents.sql`
 4. `20261003000200_optional_public_vehicle_photos.sql`
 5. `20261005000100_verification_evidence_retention.sql`
+6. `20261006000100_account_closure_and_anonymization.sql`
+7. `20261006000200_operational_integrity_hardening.sql`
+8. `20261006000300_initial_admin_bootstrap.sql`
+9. `20261006000400_retention_cron_and_booking_webhook.sql`
+10. `20261006000500_bootstrap_initial_admin_fix.sql`
+11. `20261006000600_booking_push_service_role_permissions.sql`
 
-For a fresh database, use the tracked base schema and five migrations in a disposable project first. The configured existing Production project was initialized manually from `supabase/schema.sql`; its migration ledger was absent, and read-only inspection found the first four migrations pending. The retention migration is new in this change. Adopt and compare the manually applied baseline into Supabase migration history before deploying; do not run `db push` or paste migrations into SQL Editor blindly. CLI authentication, Docker, and a disposable project were unavailable on the snapshot date. See [EP-04 research](../research/2026-10-05-ep04-research.md) and [EP-04 plan](../plans/2026-10-05-ep04-plan.md).
+For a fresh database, apply the base schema and all eleven migrations in an isolated project first. On 6 Oct 2026, `supabase migration list` reported the baseline and all eleven local migrations present in both the configured Production and staging ledgers. This verifies migration history, not every schema object, RLS policy, or user flow; the enabled booking trigger and deployed push function were separately checked. Do not reapply the chain. See [EP-04 research](../research/2026-10-05-ep04-research.md) and [EP-04 plan](../plans/2026-10-05-ep04-plan.md).
 
 ### Main persisted entities
 
@@ -103,11 +109,11 @@ Demo file paths are synthetic. The photo preview is a placeholder, not a real ph
 ## Known gaps and rollout dependencies
 
 - The original source PRD is referenced by an earlier review but not present in the repo; see [product handoff](README.md).
-- The configured Production project is missing the EP-04 schema and migration ledger as of 5 Oct 2026; actual live RLS/Storage behavior therefore does not yet support EP-04. CLI access and a disposable validation project are not available in this checkout.
+- Full end-to-end Supabase RLS/Storage behavior remains unvalidated, even though the Production migration ledger now contains the tracked baseline and migrations.
 - Phone/password accounts do not verify phone ownership. Password recovery and impersonation handling are not implemented; define human support before public launch.
 - No stand contact/help or customer incident-reporting destination is configured. Support cannot be promised from the app.
 - Review the proposed evidence-retention windows and validate/deploy the server-side purge worker before collecting real Aadhaar or other identity files; the local worker is unscheduled and legal/privacy review remains required.
-- Android push needs EAS project ID, FCM V1 credentials, deployed Edge Function, secret, Database Webhook, and device validation. Expo Go is not a push validation target.
+- Android push still needs authenticated owner delivery validation on a physical device. The Firebase client config and EAS FCM V1 credential are in place; the trigger, matching shared secret, and deployed Edge Function are verified. Do not add a second Database Webhook. Expo Go is not a push validation target.
 - Photon public endpoint has no SLA. Choose a managed or hosted geocoder before public traffic.
 - Date and time are plain text. Overnight availability windows are unsupported. Validate schedule behavior on Android in the pilot town.
 - App, SQL, and push/runtime behavior have not been jointly validated against a disposable Supabase project in this workspace.

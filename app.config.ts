@@ -9,6 +9,7 @@ const config: ExpoConfig = {
   userInterfaceStyle: 'light',
   android: {
     package: 'in.merasaarthi.cabs',
+    googleServicesFile: './google-services.json',
     versionCode: 1,
     adaptiveIcon: { backgroundColor: '#F2F7F3' },
   },

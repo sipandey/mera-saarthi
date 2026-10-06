@@ -294,6 +294,7 @@ export const COPY = {
   back: { en: 'Back', hi: 'वापस' },
   signOut: { en: 'Sign out', hi: 'लॉग आउट' },
   switchToEnglish: { en: 'Switch to English', hi: 'अंग्रेज़ी में बदलें' },
+  switchToHindi: { en: 'Switch to Hindi', hi: 'हिंदी में बदलें' },
   vehicleHatchback: { en: 'Hatchback', hi: 'हैचबैक' },
   vehicleSedan: { en: 'Sedan', hi: 'सेडान' },
   vehicleSUV: { en: 'SUV', hi: 'एसयूवी' },

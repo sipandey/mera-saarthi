@@ -21,11 +21,23 @@ Append a new entry every time:
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-06 — announce the language toggle's actual destination
+
+**Bug:** After switching to English, the language control's screen-reader label still announced “Switch to English” even though tapping it switched back to Hindi.
+**Root cause:** The shared header used the fixed `switchToEnglish` copy in both language states.
+**Avoid:** Set the accessibility label from the current language and announce the language the control will switch to.
+
 ### 2026-10-06 — duplicate booking pushes from two dispatch configurations
 
 **Bug:** Push setup instructions told operators to create a Supabase Database Webhook even though the migration already installed an INSERT trigger that sends the same event through `pg_net`. The trigger also reads its shared secret from `private.service_secrets`, while the function separately reads the matching value from its Edge Function environment.
 **Root cause:** Setup documentation did not follow the database-managed dispatch path or explain that the secret must be configured on both sides.
 **Correction:** Document the trigger as the sole dispatcher, remove the manual webhook step, and give explicit instructions for setting both secret copies.
+
+### 2026-10-06 — service-role key without table grants breaks booking push lookups
+
+**Bug:** `send-booking-request` returned HTTP 502 before sending a push on a fresh Supabase project.
+**Root cause:** The booking tables had no explicit table-level SELECT grants for `service_role`; bypassing row-level security does not bypass PostgreSQL table privileges.
+**Correction:** Grant the function SELECT on vehicles, profiles, and push tokens, plus DELETE on push tokens for Expo-reported stale-token cleanup.
 
 ### 2026-10-06 — install app dependencies before EAS resolves config plugins
 
