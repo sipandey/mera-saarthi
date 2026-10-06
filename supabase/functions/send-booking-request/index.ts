@@ -53,6 +53,17 @@ Deno.serve(async (request: Request) => {
     if (!response.ok) throw new Error(`Supabase lookup failed (${response.status})`);
     return await response.json();
   };
+  const deleteTokens = async (ownerId: string, tokens: string[]) => {
+    if (!tokens.length) return;
+    const url = new URL('/rest/v1/push_tokens', supabaseUrl);
+    url.searchParams.set('owner_id', `eq.${ownerId}`);
+    url.searchParams.set('expo_push_token', `in.(${tokens.join(',')})`);
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: { ...apiHeaders, Prefer: 'return=minimal' },
+    });
+    if (!response.ok) throw new Error(`Supabase token cleanup failed (${response.status})`);
+  };
 
   try {
     const vehicles = await query('vehicles', {
@@ -83,7 +94,8 @@ Deno.serve(async (request: Request) => {
       .filter((token) => /^Expo(nent)?PushToken\[[^\]]+\]$/.test(token));
     if (!tokens.length) return json({ delivered: 0, skipped: true });
 
-    let delivered = 0;
+    let accepted = 0;
+    let removed = 0;
     for (let offset = 0; offset < tokens.length; offset += 100) {
       const batch = tokens.slice(offset, offset + 100);
       const pushResponse = await fetch('https://exp.host/--/api/v2/push/send', {
@@ -94,6 +106,7 @@ Deno.serve(async (request: Request) => {
           title: 'New ride request',
           body: 'Open Mera Saarthi to review the booking request.',
           sound: 'default',
+          priority: 'high',
           channelId: 'booking-requests',
           data: { bookingId: booking.id },
         }))),
@@ -101,15 +114,24 @@ Deno.serve(async (request: Request) => {
 
       if (!pushResponse.ok) {
         // Delivery is best effort. A push outage must never change booking state.
-        return json({ delivered, attempted: offset + batch.length, error: 'Push provider unavailable' }, 502);
+        return json({ accepted, attempted: offset + batch.length, error: 'Push provider unavailable' }, 502);
       }
 
-      const result = await pushResponse.json();
-      if (Array.isArray(result.data)) {
-        delivered += result.data.filter((ticket: { status?: string }) => ticket.status === 'ok').length;
+      const result = await pushResponse.json() as {
+        data?: Array<{ status?: string; details?: { error?: string } }>;
+      };
+      if (!Array.isArray(result.data) || result.data.length !== batch.length) {
+        throw new Error('Expo returned an invalid push ticket response');
       }
+      accepted += result.data.filter((ticket) => ticket.status === 'ok').length;
+      const staleTokens = result.data.flatMap((ticket, index) =>
+        ticket.status === 'error' && ticket.details?.error === 'DeviceNotRegistered' ? [batch[index]] : []
+      );
+      await deleteTokens(vehicle.owner_id, staleTokens);
+      removed += staleTokens.length;
     }
-    return json({ delivered, attempted: tokens.length });
+    // An accepted ticket means Expo queued the message; it is not a delivery receipt.
+    return json({ accepted, attempted: tokens.length, staleTokensRemoved: removed });
   } catch (error) {
     // Avoid logging booking IDs, tokens, phone numbers, or service credentials.
     console.error(error instanceof Error ? error.message : 'Booking push failed');

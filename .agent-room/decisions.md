@@ -22,6 +22,12 @@ have to re-derive it from scratch by reading git history.
 **Why:** Automatic builds on every merge consume the project's limited free-tier build allocation. Manual dispatch lets the team choose when a production build is needed.
 **Rejected:** Removing the workflow entirely, because a manual production build remains useful when the team is ready to release.
 
+### 2026-10-06 — use one booking push dispatch path and clean invalid tokens
+
+**Decision:** Use only the `pg_net` INSERT trigger from `20261006000400_retention_cron_and_booking_webhook.sql` to invoke `send-booking-request`; do not also configure a Supabase Database Webhook. Treat Expo push tickets as acceptance rather than delivery, and remove a token immediately when Expo reports `DeviceNotRegistered` on a ticket.
+**Why:** Two dispatch mechanisms for one booking produce duplicate owner alerts. A ticket's `ok` status means Expo accepted the payload, and a permanently unregistered token should not be retried for every booking.
+**Rejected:** Keeping both manual and SQL-managed webhooks, because operators could unknowingly send each booking twice; calling ticket acceptance delivery, because it does not confirm provider/device delivery.
+
 ### 2026-10-06 — trigger Android EAS production builds from main
 
 **Decision:** Use GitHub Actions on pushes to `main` to queue the existing EAS `production` Android build profile. Run Node.js 22, install project dependencies with `npm ci` before resolving app config plugins, enforce EAS CLI 24.11.0 in both `eas.json` and the action, authenticate through the repository Actions secret `EXPO_TOKEN`, submit to EAS without waiting for cloud completion, and do not submit automatically to Google Play.

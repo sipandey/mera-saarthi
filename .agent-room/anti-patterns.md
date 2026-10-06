@@ -21,6 +21,12 @@ Append a new entry every time:
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-06 — duplicate booking pushes from two dispatch configurations
+
+**Bug:** Push setup instructions told operators to create a Supabase Database Webhook even though the migration already installed an INSERT trigger that sends the same event through `pg_net`. The trigger also reads its shared secret from `private.service_secrets`, while the function separately reads the matching value from its Edge Function environment.
+**Root cause:** Setup documentation did not follow the database-managed dispatch path or explain that the secret must be configured on both sides.
+**Correction:** Document the trigger as the sole dispatcher, remove the manual webhook step, and give explicit instructions for setting both secret copies.
+
 ### 2026-10-06 — install app dependencies before EAS resolves config plugins
 
 **What happened:** The GitHub Actions EAS build failed to resolve the `expo-location` config plugin because the runner invoked EAS before installing the app's npm dependencies.

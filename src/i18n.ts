@@ -169,6 +169,7 @@ export const COPY = {
   pushUnsupported: { en: 'Booking alerts are available on Android only.', hi: 'बुकिंग अलर्ट सिर्फ़ Android पर उपलब्ध हैं।' },
   pushFailed: { en: 'Booking alerts could not be enabled. Check your connection and retry.', hi: 'बुकिंग अलर्ट चालू नहीं हुए। इंटरनेट जाँचकर फिर कोशिश करें।' },
   enableAlerts: { en: 'Enable booking alerts', hi: 'बुकिंग अलर्ट चालू करें' },
+  disableAlerts: { en: 'Turn off booking alerts on this phone', hi: 'इस फोन पर बुकिंग अलर्ट बंद करें' },
   openedRequest: { en: 'Opened the booking request from your notification.', hi: 'नोटिफिकेशन से बुकिंग की अर्जी खोली गई।' },
   cash: { en: 'Pay the driver in cash', hi: 'ड्राइवर को नकद दें' },
   quote: { en: 'Estimated fare', hi: 'अनुमानित किराया' },

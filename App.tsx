@@ -32,6 +32,7 @@ import { registerOwnerPushNotifications } from './src/pushNotifications';
 import { latestVerificationDocument, requiredVerificationDocumentsApproved } from './src/verification';
 
 const KEY = 'mera-saarthi-demo-v1';
+const pushTokenStorageKey = (ownerId: string) => `mera-saarthi-push-token:${ownerId}`;
 const DEMO_DATE = '2026-10-03T09:00:00.000Z';
 const INITIAL: Store = {
   cabs: [
@@ -258,15 +259,59 @@ export default function App() {
         return;
       }
       await saveCloudPushToken(ownerId, registration.token);
+      await AsyncStorage.setItem(pushTokenStorageKey(ownerId), registration.token);
       pushToken.current = registration.token;
       setPushState('ready');
     } catch {
       setPushState('error');
     }
   };
+  const disablePush = async () => {
+    if (!cloudUser || !pushToken.current) {
+      setPushState('idle');
+      return;
+    }
+    setPushState('setting_up');
+    try {
+      await removeCloudPushToken(cloudUser.id, pushToken.current);
+      await AsyncStorage.removeItem(pushTokenStorageKey(cloudUser.id));
+      pushToken.current = null;
+      setPushState('idle');
+    } catch {
+      setPushState('error');
+    }
+  };
+  useEffect(() => {
+    if (!cloudUser || profile?.role !== 'owner') return;
+    let cancelled = false;
+    const restorePushState = async () => {
+      const token = await AsyncStorage.getItem(pushTokenStorageKey(cloudUser.id));
+      if (!token || cancelled) return;
+      const permission = await Notifications.getPermissionsAsync();
+      if (permission.status !== 'granted') {
+        await removeCloudPushToken(cloudUser.id, token).catch(() => undefined);
+        await AsyncStorage.removeItem(pushTokenStorageKey(cloudUser.id));
+        if (!cancelled) setPushState('permission_denied');
+        return;
+      }
+      const { data, error } = await supabase!.from('push_tokens').select('expo_push_token')
+        .eq('owner_id', cloudUser.id).eq('expo_push_token', token).maybeSingle();
+      if (error) throw error;
+      if (!cancelled && data) {
+        pushToken.current = token;
+        setPushState('ready');
+      } else if (!cancelled) {
+        await AsyncStorage.removeItem(pushTokenStorageKey(cloudUser.id));
+        setPushState('idle');
+      }
+    };
+    restorePushState().catch(() => { if (!cancelled) setPushState('error'); });
+    return () => { cancelled = true; };
+  }, [cloudUser?.id, profile?.role]);
   useEffect(() => {
     if (!cloudUser || profile?.role !== 'owner') return;
     const handleResponse = (response: Notifications.NotificationResponse) => {
+      void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
       const bookingId = response.notification.request.content.data?.bookingId;
       if (typeof bookingId !== 'string') return;
       setFocusBookingId(bookingId);
@@ -490,6 +535,7 @@ export default function App() {
   const signOut = async () => {
     if (cloudUser && pushToken.current) {
       await removeCloudPushToken(cloudUser.id, pushToken.current).catch(() => undefined);
+      await AsyncStorage.removeItem(pushTokenStorageKey(cloudUser.id));
       pushToken.current = null;
     }
     await supabase?.auth.signOut();
@@ -578,7 +624,7 @@ export default function App() {
     const ownBookings = store.bookings.filter((booking) => owned.some((cab) => cab.id === booking.cabId));
     const ownerAccount = store.profiles.find((item) => item.id === ownerId);
     const demoOwners = demoMode ? store.profiles.filter((item) => item.role === 'owner').map((item) => ({ id: item.id, name: item.full_name })) : undefined;
-    content = <>{header(t('ownerPanel'))}<OwnerDashboardContent owned={owned} bookings={ownBookings} currentOwnerId={ownerId} ownerName={profile?.full_name ?? ownerAccount?.full_name ?? ''} ownerReviewStatus={cloudUser ? profile?.owner_review_status : ownerAccount?.owner_review_status} showDriverPhoto={cloudUser ? Boolean(profile?.show_driver_photo) : Boolean(ownerAccount?.show_driver_photo)} onToggleDriverPhoto={(show) => void toggleDriverPhoto(show)} documents={store.documents ?? []} vehicleExpiry={(id, type) => vehicleExpiryDates[id]?.[type] ?? (latestVerificationDocument(store.documents ?? [], ownerId, id, type)?.expiresOn ?? '')} setVehicleExpiry={(id, type, value) => setVehicleExpiryDates((current) => ({ ...current, [id]: { insurance: current[id]?.insurance ?? '', pollution: current[id]?.pollution ?? '', [type]: value } }))} onUploadDocument={(type, vehicleId) => void uploadDocument(type, vehicleId)} onWithdrawVehiclePhoto={(document) => void withdrawVehiclePhoto(document)} demoOwners={demoOwners} demoOwnerId={demoOwnerId} onSelectDemoOwner={setDemoOwnerId} pushState={demoMode ? 'unsupported' : pushState} focusBookingId={focusBookingId} onEnablePush={() => cloudUser && void enablePush(cloudUser.id)} hindi={hindi} t={t} rolePicker={rolePicker()} onAddVehicle={() => setPage('add')} onEditVehicle={editCab} onToggleAvailability={toggleAvailability} onChangeStatus={changeBooking} />{bottomNav('owner')}</>;
+    content = <>{header(t('ownerPanel'))}<OwnerDashboardContent owned={owned} bookings={ownBookings} currentOwnerId={ownerId} ownerName={profile?.full_name ?? ownerAccount?.full_name ?? ''} ownerReviewStatus={cloudUser ? profile?.owner_review_status : ownerAccount?.owner_review_status} showDriverPhoto={cloudUser ? Boolean(profile?.show_driver_photo) : Boolean(ownerAccount?.show_driver_photo)} onToggleDriverPhoto={(show) => void toggleDriverPhoto(show)} documents={store.documents ?? []} vehicleExpiry={(id, type) => vehicleExpiryDates[id]?.[type] ?? (latestVerificationDocument(store.documents ?? [], ownerId, id, type)?.expiresOn ?? '')} setVehicleExpiry={(id, type, value) => setVehicleExpiryDates((current) => ({ ...current, [id]: { insurance: current[id]?.insurance ?? '', pollution: current[id]?.pollution ?? '', [type]: value } }))} onUploadDocument={(type, vehicleId) => void uploadDocument(type, vehicleId)} onWithdrawVehiclePhoto={(document) => void withdrawVehiclePhoto(document)} demoOwners={demoOwners} demoOwnerId={demoOwnerId} onSelectDemoOwner={setDemoOwnerId} pushState={demoMode ? 'unsupported' : pushState} focusBookingId={focusBookingId} onEnablePush={() => cloudUser && void enablePush(cloudUser.id)} onDisablePush={() => void disablePush()} hindi={hindi} t={t} rolePicker={rolePicker()} onAddVehicle={() => setPage('add')} onEditVehicle={editCab} onToggleAvailability={toggleAvailability} onChangeStatus={changeBooking} />{bottomNav('owner')}</>;
   } else if (page === 'add') {
     content = <>{header(editingCabId ? t('editVehicle') : t('addVehicle'), () => { setEditingCabId(null); setNewName(''); setPage('owner'); })}<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}><VehicleFormContent hindi={hindi} t={t} newName={newName} setNewName={setNewName} newType={newType} setNewType={setNewType} newSeats={newSeats} setNewSeats={setNewSeats} newHourly={newHourly} setNewHourly={setNewHourly} newFullDay={newFullDay} setNewFullDay={setNewFullDay} newPerKm={newPerKm} setNewPerKm={setNewPerKm} registrationNumber={newRegistration} setRegistrationNumber={setNewRegistration} availabilityStart={newAvailabilityStart} setAvailabilityStart={setNewAvailabilityStart} availabilityEnd={newAvailabilityEnd} setAvailabilityEnd={setNewAvailabilityEnd} onSave={addCab} /></KeyboardAvoidingView></>;
   } else {
