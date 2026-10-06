@@ -52,3 +52,16 @@ The first attempt to fetch the documented EAS preview artifact required an Expo 
 - The scaffold validator could not be run: npm could not resolve `registry.npmjs.org` (`ENOTFOUND`).
 
 No production service was modified. Demo records are local to the emulator.
+
+## Follow-up after the EAS workflow merge
+
+The app source used for the QA run above is still the app source on `main` at `e1c4d09`; changes since the QA commit `18a94aa` are CI, EAS CLI configuration, and documentation only. The local release APK remains at `android/app/build/outputs/apk/release/app-release.apk` (67 MiB), and the emulator reports package `in.merasaarthi.cabs`, version `1.0.0`, version code `1`, last updated at 16:01 on 6 Oct.
+
+| Follow-up check | Result | Evidence |
+|---|---|---|
+| Main-branch EAS workflow | Pass — dispatch accepted | [GitHub Actions run #3](https://github.com/sipandey/mera-saarthi/actions/runs/37453821550) completed successfully for `e1c4d09`. |
+| EAS cloud artifact | Pending | Production build `b8a2ee83-1d82-4e49-9839-8d03df9dcbc2` was still queued when checked; the workflow uses `--no-wait`, so job success does not prove the AAB completed. |
+| New preview build | Not produced | The latest EAS preview listed was from `5620094`, before the destination-autocomplete app changes. Local EAS CLI reports not logged in. |
+| Fresh emulator interaction | Blocked | Host disk had 49 MiB free during the emulator launch attempt; the launcher reported insufficient space. ADB subsequently saw `emulator-5554` and an initial query returned boot complete/API 35 with the app installed, but later shell/UI queries stopped responding and screenshot capture failed with “no space left on device.” No additional scenarios are marked passed from this follow-up. |
+
+The earlier manual demo-mode results remain applicable to the current app source. The complete release gate is still open: production build completion, physical Android validation (especially push), backend/security and resilience scenarios, Play declarations, and named operational owners.
