@@ -1,6 +1,6 @@
 # Product and engineering handoff
 
-**Snapshot:** 5 Oct 2026  
+**Snapshot:** 6 Oct 2026
 **Product:** Mera Saarthi, Android-first cab booking for a one-town Indian pilot  
 **Status key:** `Implemented` means present in the app/source; `Rollout pending` means the code depends on unapplied/unverified backend or operator setup; `Partial` means some acceptance criteria are missing; `Deferred` means intentionally outside the first pilot.
 
@@ -10,6 +10,7 @@
 2. Read [current application map](current-state.md) to find the owner of each flow and the current operational limits.
 3. Use the [epics and stories](../plans/prd-backlog-implementation.md) for acceptance criteria, implementation references, status, and demo evidence; use the [roadmap](../plans/prd-mvp-roadmap.md) for sequencing and release gates.
 4. Follow repository rules in `AGENTS.md`, `.agent-room/guardrails.md`, `.agent-room/decisions.md`, and `.agent-room/anti-patterns.md`.
+5. For release work, start with the [market-readiness audit](../research/2026-10-06-market-readiness-audit.md) and [EP-08 launch plan](../plans/2026-10-06-market-readiness-plan.md).
 
 ## Source-of-truth order
 
@@ -33,4 +34,4 @@ The source PRD cited by the earlier gap review (`Local Cab Booking App — Produ
 
 ## Current delivery caveat
 
-The worktree contains the driver/vehicle verification and photo implementation plus its migrations. The local app environment was found to point at a dashboard project labeled Production, but the Supabase CLI is not authenticated and the project's migration ledger is empty. Read-only inspection found the EP-04 schema and Storage bucket absent. Review [EP-04 research](../research/2026-10-05-ep04-research.md) before attempting rollout; do not treat migration files as deployed. See [current application map](current-state.md).
+The worktree contains the driver/vehicle verification and photo implementation plus its migrations. The local app environment was found to point at a dashboard project labeled Production, but the Supabase CLI is not authenticated and the project's migration ledger is empty. Read-only inspection found the EP-04 schema and Storage bucket absent. The 6 Oct re-audit also found missing release configuration, privacy/support/account-deletion surfaces, and a relational blocker for deleting accounts that have booking history. Review [EP-04 research](../research/2026-10-05-ep04-research.md) and the [market-readiness audit](../research/2026-10-06-market-readiness-audit.md) before rollout; do not treat migration files as deployed. See [current application map](current-state.md).

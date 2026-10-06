@@ -1,6 +1,6 @@
 # Current application map
 
-**Snapshot:** 5 Oct 2026. Describes the working tree, including local driver/vehicle verification and photo changes.  
+**Snapshot:** 6 Oct 2026. Describes the working tree, including local driver/vehicle verification and photo changes.
 **Code is not proof of deployment:** read-only inspection on 5 Oct 2026 found the configured dashboard project labeled Production, but the app repo has no authenticated CLI link or migration ledger.
 
 ## User-visible areas
@@ -111,3 +111,6 @@ Demo file paths are synthetic. The photo preview is a placeholder, not a real ph
 - Photon public endpoint has no SLA. Choose a managed or hosted geocoder before public traffic.
 - Date and time are plain text. Overnight availability windows are unsupported. Validate schedule behavior on Android in the pilot town.
 - App, SQL, and push/runtime behavior have not been jointly validated against a disposable Supabase project in this workspace.
+- The app permits account creation but has no in-app closure flow or external deletion page. The current booking foreign keys can prevent deletion of profiles/vehicles with booking history, while booking snapshots retain names and trip places; a reviewed server-side anonymization/deletion workflow is required before release.
+- No EAS build profiles/project ID, app icon/splash assets, or signed release artifact exist. Expo Doctor recommends upgrading SDK 56 to SDK 57 and aligning TypeScript before release.
+- See the [6 Oct market-readiness audit](../research/2026-10-06-market-readiness-audit.md) and [EP-08 launch plan](../plans/2026-10-06-market-readiness-plan.md) for the ordered release path.

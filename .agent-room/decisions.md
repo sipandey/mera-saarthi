@@ -16,6 +16,12 @@ have to re-derive it from scratch by reading git history.
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-06 — complete market readiness before adding marketplace features
+
+**Decision:** Make EP-08 the next epic: signed Android builds, privacy/help/account closure, reproducible Supabase migrations, initial-admin provisioning, retention operations, staging/device validation, and a Play closed pilot. Use an idempotent server-side account-closure workflow that anonymizes retained operational booking data before relational/Auth identity is removed.
+**Why:** The existing customer, owner, admin, verification, and booking flows cover the one-town MVP, while release configuration and account/privacy operations currently block real users and Play distribution.
+**Rejected:** Starting payments, tracking, ratings, multi-town support, or a web admin first, because those features would increase scope without resolving the current launch gates.
+
 ### 2026-10-05 — show booking audit history only in admin operations
 
 **Decision:** Load `booking_status_history` only for the admin role and show its status transitions, reasons, actor labels, and timestamps in the admin booking list. Keep demo history synthetic and record every demo transition locally.

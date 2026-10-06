@@ -1,6 +1,6 @@
 # Mera Saarthi — MVP scope and roadmap
 
-**Snapshot:** 5 Oct 2026
+**Snapshot:** 6 Oct 2026
 **Product:** Android-first local cab booking for a single Indian pilot town
 **Primary spec:** [Requirements and MVP scope](../product/requirements-and-mvp.md)
 **Current code map:** [Current application map](../product/current-state.md)
@@ -30,6 +30,10 @@ This roadmap is the current product scope. The earlier gap review references an 
 ## Roadmap
 
 The plan is milestone-based; delivery dates and pilot thresholds have not been agreed. Use the story status in the [detailed backlog](prd-backlog-implementation.md), not the roadmap phase heading, to distinguish code from rollout.
+
+### Current priority — EP-08 market readiness
+
+Pause feature expansion and execute the [EP-08 market-readiness plan](2026-10-06-market-readiness-plan.md). It owns release builds, privacy/help links, safe account closure, reproducible migrations, initial-admin provisioning, retention operations, staging/device validation, and the Play closed pilot. These are P0 release gates for the already implemented MVP.
 
 ### Phase 0 — pilot release gates (P0)
 
