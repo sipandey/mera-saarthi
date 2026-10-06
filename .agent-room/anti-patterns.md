@@ -21,6 +21,12 @@ Append a new entry every time:
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-06 — do not parse client dates without explicit timezone offset
+
+**What happened:** Database slot triggers evaluate pickup hours using `(pickup_at AT TIME ZONE 'Asia/Kolkata')::time`, but client dates constructed from strings like `new Date(`${date}T${time}:00`)` parsed in the device's local timezone. On devices running in UTC or non-IST timezones, pickup times drifted by 5.5+ hours and caused false `check_booking_slot` rejections.
+**Root cause:** Date parsing omitted the explicit `+05:30` offset required for pilot town operations.
+**Avoid:** Always anchor client date/time strings to `+05:30` when interacting with server availability, slot conflict checks, or booking creation.
+
 ### 2026-10-06 — do not equate a profile-delete trigger with account deletion
 
 **What happened:** The evidence-retention migration queued files from a profile-delete trigger, but profiles and owner vehicles with booking history cannot necessarily be deleted because booking foreign keys are restrictive. Booking snapshots would also retain names and trip places.

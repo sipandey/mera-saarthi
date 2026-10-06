@@ -341,12 +341,15 @@ export const COPY = {
   accountDeleted: { en: 'Your account has been closed successfully.', hi: 'आपका खाता सफलतापूर्वक बंद कर दिया गया है।' },
   accountDeletionFailed: { en: 'Could not close account. Please contact support.', hi: 'खाता बंद नहीं हो सका। कृपया सपोर्ट से संपर्क करें।' },
   openInBrowser: { en: 'Open in browser', hi: 'ब्राउज़र में खोलें' },
+  callSupport: { en: 'Call Support', hi: 'सपोर्ट को कॉल करें' },
+  emailSupport: { en: 'Email Support', hi: 'ईमेल सपोर्ट' },
 } as const;
 
 export type CopyKey = keyof typeof COPY;
 
-export function translate(key: CopyKey, language: Language, values?: Record<string, string | number>): string {
-  let text: string = COPY[key][language];
+export function translate(key: CopyKey | string, language: Language, values?: Record<string, string | number>): string {
+  const entry = (COPY as Record<string, Record<Language, string>>)[key];
+  let text = entry?.[language] ?? entry?.en ?? key;
   if (values) text = text.replace(/\{\{(\w+)\}\}/g, (_match, name: string) => String(values[name] ?? ''));
   return text;
 }

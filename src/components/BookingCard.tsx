@@ -29,7 +29,7 @@ export function BookingCard({
           : booking.statusReason === 'driver_no_show' ? t('reasonNoShowDriver')
             : booking.statusReason === 'customer_no_show' ? t('reasonNoShowCustomer') : t('cancelled');
   const statusStyle = accepted || booking.status === 'completed' ? styles.badgeGood : pending ? styles.badgeWait : styles.badgeMuted;
-  const pickupAt = new Date(`${booking.date}T${booking.time}:00`);
+  const pickupAt = new Date(`${booking.date}T${booking.time}:00+05:30`);
   const canReportNoShow = accepted && Number.isFinite(pickupAt.getTime()) && Date.now() >= pickupAt.getTime();
   const reasonKey = booking.statusReason === 'reasonPlansChanged' ? 'reasonPlansChanged'
     : booking.statusReason === 'reasonBookedElsewhere' ? 'reasonBookedElsewhere'

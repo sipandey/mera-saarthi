@@ -6,8 +6,10 @@ export type CloudRole = 'customer' | 'owner' | 'admin';
 
 const fail = (error: { message: string } | null) => { if (error) throw new Error(error.message); };
 const asText = (value: string | null | undefined) => value ?? '';
-const localDate = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-const localTime = (value: Date) => `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
+const indiaDateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+const indiaTimeFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+const localDate = (value: Date) => indiaDateFormatter.format(value);
+const localTime = (value: Date) => indiaTimeFormatter.format(value);
 
 export async function loadCloudData(userId: string, role: CloudRole, profileName: string, profilePhone: string, ownerReviewStatus?: ReviewStatus | null) {
   if (!supabase) throw new Error('Supabase is not configured.');
@@ -152,7 +154,7 @@ export async function createCloudBooking(input: {
   vehicleType: string; date: string; time: string; hours: number; pickupLocation: string; destination: string; km: number; estimate: number; requestKey: string;
 }) {
   if (!supabase) throw new Error('Supabase is not configured.');
-  const pickupAt = new Date(`${input.date}T${input.time}:00`);
+  const pickupAt = new Date(`${input.date}T${input.time}:00+05:30`);
   if (!Number.isFinite(pickupAt.getTime())) throw new Error('Enter a valid date and time.');
   const { data, error } = await supabase.from('bookings').insert({
     customer_id: input.customerId, vehicle_id: input.cabId, ride_type: input.rideType,

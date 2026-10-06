@@ -16,6 +16,12 @@ have to re-derive it from scratch by reading git history.
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-06 — prefill vehicle document expiry from existing latest evidence
+
+**Decision:** When uploading replacement documents or viewing the owner dashboard, prefill and fallback insurance and PUC expiry dates to the latest approved/submitted document's `expiresOn` date if the owner has not modified the expiry input.
+**Why:** Requiring re-entry of an unchanged valid future expiry date when uploading a new photo or re-verifying causes unnecessary friction and false validation rejections.
+**Rejected:** Forcing owners to re-enter expiry dates on every single document upload attempt.
+
 ### 2026-10-06 — automate retention purges with pg_cron and push dispatch with pg_net
 
 **Decision:** Deploy `purge-verification-files` and `send-booking-request` as Supabase Edge Functions with secret authentication via custom request headers. Isolate service configuration and function secrets in a private PostgreSQL schema (`private.service_secrets`) inaccessible to public/authenticated clients. Use `pg_cron` to schedule the daily retention worker invocation at 03:00 IST (21:30 UTC), and use `pg_net` in an asynchronous database trigger on `bookings` (INSERT) to dispatch push alerts without delaying or risking transaction rollback.

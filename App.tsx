@@ -180,12 +180,12 @@ export default function App() {
   }, [cloudUser?.id]);
 
   const results = useMemo(() => {
-    const requestedStart = new Date(`${date}T${time}:00`).getTime();
+    const requestedStart = new Date(`${date}T${time}:00+05:30`).getTime();
     const requestedEnd = requestedStart + Math.max(1, Number(hours) || 1) * 60 * 60 * 1000;
     const available = store.cabs.filter((cab) => {
       const conflict = Number.isFinite(requestedStart) && store.bookings.some((b) => {
         if (b.cabId !== cab.id || !['pending', 'accepted'].includes(b.status)) return false;
-        const start = new Date(`${b.date}T${b.time}:00`).getTime();
+        const start = new Date(`${b.date}T${b.time}:00+05:30`).getTime();
         const end = start + Math.max(1, b.hours || 1) * 60 * 60 * 1000;
         return Number.isFinite(start) && requestedStart < end && start < requestedEnd;
       });
@@ -210,7 +210,7 @@ export default function App() {
   const amountFor = (cab: Cab) => kind === 'local' ? (Number(hours) >= 8 ? cab.fullDay : cab.hourly * Math.max(1, Number(hours) || 1)) : 0;
   const openResults = () => {
     if (!pickupArea.trim()) { Alert.alert(t('pickupArea'), t('pickupRequired')); return; }
-    const rideAt = new Date(`${date}T${time}:00`);
+    const rideAt = new Date(`${date}T${time}:00+05:30`);
     if (!Number.isFinite(rideAt.getTime()) || rideAt.getTime() < Date.now() || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
       Alert.alert(t('checkDateTime'), t('futureDateTime')); return;
     }
@@ -433,7 +433,10 @@ export default function App() {
   };
   const uploadDocument = async (type: DocumentType, vehicleId: string | null) => {
     const ownerId = cloudUser?.id ?? demoOwnerId;
-    const expiry = vehicleId && (type === 'insurance' || type === 'pollution') ? vehicleExpiryDates[vehicleId]?.[type] ?? '' : null;
+    const existingDoc = vehicleId ? latestVerificationDocument(store.documents ?? [], ownerId, vehicleId, type) : null;
+    const expiry = vehicleId && (type === 'insurance' || type === 'pollution')
+      ? (vehicleExpiryDates[vehicleId]?.[type]?.trim() || existingDoc?.expiresOn || '')
+      : null;
     if ((type === 'insurance' || type === 'pollution') && (!expiry || !/^\d{4}-\d{2}-\d{2}$/.test(expiry) || expiry < todayInIndia())) {
       Alert.alert(t('checkDetails'), t('expiryRequired')); return;
     }
@@ -575,7 +578,7 @@ export default function App() {
     const ownBookings = store.bookings.filter((booking) => owned.some((cab) => cab.id === booking.cabId));
     const ownerAccount = store.profiles.find((item) => item.id === ownerId);
     const demoOwners = demoMode ? store.profiles.filter((item) => item.role === 'owner').map((item) => ({ id: item.id, name: item.full_name })) : undefined;
-    content = <>{header(t('ownerPanel'))}<OwnerDashboardContent owned={owned} bookings={ownBookings} currentOwnerId={ownerId} ownerName={profile?.full_name ?? ownerAccount?.full_name ?? ''} ownerReviewStatus={cloudUser ? profile?.owner_review_status : ownerAccount?.owner_review_status} showDriverPhoto={cloudUser ? Boolean(profile?.show_driver_photo) : Boolean(ownerAccount?.show_driver_photo)} onToggleDriverPhoto={(show) => void toggleDriverPhoto(show)} documents={store.documents ?? []} vehicleExpiry={(id, type) => vehicleExpiryDates[id]?.[type] ?? ''} setVehicleExpiry={(id, type, value) => setVehicleExpiryDates((current) => ({ ...current, [id]: { insurance: current[id]?.insurance ?? '', pollution: current[id]?.pollution ?? '', [type]: value } }))} onUploadDocument={(type, vehicleId) => void uploadDocument(type, vehicleId)} onWithdrawVehiclePhoto={(document) => void withdrawVehiclePhoto(document)} demoOwners={demoOwners} demoOwnerId={demoOwnerId} onSelectDemoOwner={setDemoOwnerId} pushState={demoMode ? 'unsupported' : pushState} focusBookingId={focusBookingId} onEnablePush={() => cloudUser && void enablePush(cloudUser.id)} hindi={hindi} t={t} rolePicker={rolePicker()} onAddVehicle={() => setPage('add')} onEditVehicle={editCab} onToggleAvailability={toggleAvailability} onChangeStatus={changeBooking} />{bottomNav('owner')}</>;
+    content = <>{header(t('ownerPanel'))}<OwnerDashboardContent owned={owned} bookings={ownBookings} currentOwnerId={ownerId} ownerName={profile?.full_name ?? ownerAccount?.full_name ?? ''} ownerReviewStatus={cloudUser ? profile?.owner_review_status : ownerAccount?.owner_review_status} showDriverPhoto={cloudUser ? Boolean(profile?.show_driver_photo) : Boolean(ownerAccount?.show_driver_photo)} onToggleDriverPhoto={(show) => void toggleDriverPhoto(show)} documents={store.documents ?? []} vehicleExpiry={(id, type) => vehicleExpiryDates[id]?.[type] ?? (latestVerificationDocument(store.documents ?? [], ownerId, id, type)?.expiresOn ?? '')} setVehicleExpiry={(id, type, value) => setVehicleExpiryDates((current) => ({ ...current, [id]: { insurance: current[id]?.insurance ?? '', pollution: current[id]?.pollution ?? '', [type]: value } }))} onUploadDocument={(type, vehicleId) => void uploadDocument(type, vehicleId)} onWithdrawVehiclePhoto={(document) => void withdrawVehiclePhoto(document)} demoOwners={demoOwners} demoOwnerId={demoOwnerId} onSelectDemoOwner={setDemoOwnerId} pushState={demoMode ? 'unsupported' : pushState} focusBookingId={focusBookingId} onEnablePush={() => cloudUser && void enablePush(cloudUser.id)} hindi={hindi} t={t} rolePicker={rolePicker()} onAddVehicle={() => setPage('add')} onEditVehicle={editCab} onToggleAvailability={toggleAvailability} onChangeStatus={changeBooking} />{bottomNav('owner')}</>;
   } else if (page === 'add') {
     content = <>{header(editingCabId ? t('editVehicle') : t('addVehicle'), () => { setEditingCabId(null); setNewName(''); setPage('owner'); })}<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}><VehicleFormContent hindi={hindi} t={t} newName={newName} setNewName={setNewName} newType={newType} setNewType={setNewType} newSeats={newSeats} setNewSeats={setNewSeats} newHourly={newHourly} setNewHourly={setNewHourly} newFullDay={newFullDay} setNewFullDay={setNewFullDay} newPerKm={newPerKm} setNewPerKm={setNewPerKm} registrationNumber={newRegistration} setRegistrationNumber={setNewRegistration} availabilityStart={newAvailabilityStart} setAvailabilityStart={setNewAvailabilityStart} availabilityEnd={newAvailabilityEnd} setAvailabilityEnd={setNewAvailabilityEnd} onSave={addCab} /></KeyboardAvoidingView></>;
   } else {
