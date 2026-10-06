@@ -24,7 +24,7 @@ Help a customer find and request an available local cab, help an approved driver
 ### Customer booking
 
 - Offer local hire by hour/full day and outstation hire by the driver's saved one-way ₹/km rate.
-- Collect pickup, date/time, vehicle type, and the trip fields needed by the selected hire type. Keep manual pickup entry available; location permission is requested only after the customer asks to use current location.
+- Collect pickup, date/time, vehicle type, and the trip fields needed by the selected hire type. Offer Photon place suggestions for pickup and outstation destination while keeping manual entry available; request device location only after the customer asks to use current location for pickup.
 - Show only vehicles whose owner, identity evidence, vehicle evidence, availability, and block state pass the eligibility checks.
 - Explain cash payment and distinguish local estimates from outstation rates. Do not invent an outstation total from customer-entered distance.
 - Create a pending request only after server confirmation. Prevent duplicate submissions and prevent overlapping accepted/live-pending bookings for one cab.

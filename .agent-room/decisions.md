@@ -124,6 +124,12 @@ have to re-derive it from scratch by reading git history.
 **Why:** The current Android screen does not render a map, and this taxi-stand flow needs a recognizable pickup area more than turn-by-turn navigation. The Photon public endpoint is free for reasonable MVP traffic and avoids map billing/API-key setup; it has no availability guarantee, so production traffic should move to a managed geocoder or a hosted Photon instance. Show OpenStreetMap attribution.
 **Rejected:** Google Places/Maps as a hard dependency, because it requires billing setup and is not needed to identify pickup areas; requiring location permission on app start, because manual search should work when a user declines.
 
+### 2026-10-06 — reuse Photon autocomplete for outstation destinations
+
+**Decision:** Use the existing Photon-based location picker for outstation destination suggestions as well as pickup. Keep free-form manual entry, and keep the current-location permission and reverse-geocoding affordance pickup-only. Do not add a map renderer or route/distance behavior in this change.
+**Why:** Photon is already integrated for India-restricted, multilingual suggestions, so reusing it adds no SDK, key, or billing setup. MapLibre is an open-source renderer, but it still needs a tile/style service; the public OSM raster tile service is best-effort and imposes attribution, identification, caching, and usage requirements. There is no selected production tile host or service budget yet.
+**Rejected:** Adding a MapLibre view against the public OSM tile service as a production dependency before a tile-service decision, because map rendering would create a new native build dependency and operational availability dependency without improving the existing text-based booking contract.
+
 ### 2026-10-01 — use phone and password without SMS verification
 
 **Decision:** Keep Supabase Auth phone/password sign-up and sign-in, but do not invoke SMS OTP. Require Phone sign-ups enabled and phone confirmation disabled in the Supabase project; report when confirmation still prevents an immediate session.

@@ -73,13 +73,13 @@ For combined states, the story has two independent parts: **Implementation** des
 - **Demo path:** Customer → choose a search combination with no matching fixture → use suggestions, then sort a populated result set.
 - **Code:** `src/screens/CustomerScreens.tsx`, `App.tsx`.
 
-### MS-16 — Search pickup by suggestion or manual entry
+### MS-16 — Search trip places by suggestion or manual entry
 
 - **Requirement / priority:** RQ-02, RQ-09; P0.
 - **Implementation:** Implemented. **Rollout:** Photon uptime and Android permission flow pending field validation.
-- **User story:** As a customer, I want pickup suggestions when connected and a manual path when location or internet is unavailable.
-- **Acceptance criteria:** Typing can query place suggestions; current location is requested only after explicit action; permission denial or lookup failure leaves manual text entry available; no map permission is required for ordinary text entry.
-- **Demo path:** Customer search → type a pickup; use the location affordance if running on a device; verify manual entry remains possible.
+- **User story:** As a customer, I want pickup and outstation destination suggestions when connected and a manual path when internet is unavailable.
+- **Acceptance criteria:** Typing can query India place suggestions for pickup and destination; current location is requested only after explicit action and applies to pickup; lookup failure leaves manual text entry available; no map permission is required for ordinary text entry.
+- **Demo path:** Customer search → type a pickup and an outstation destination; choose suggestions and verify manual entry remains possible. The current-location affordance is pickup-only.
 - **Code:** `src/components/LocationPicker.tsx`, `src/screens/CustomerScreens.tsx`.
 - **Limit:** Public Photon service has no uptime guarantee. Select a managed/hosted provider before material public traffic.
 
