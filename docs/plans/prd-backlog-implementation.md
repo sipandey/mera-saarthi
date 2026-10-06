@@ -205,7 +205,7 @@ For combined states, the story has two independent parts: **Implementation** des
 
 - **Requirement / priority:** RQ-01; P0.
 - **Implementation:** Implemented. `eas.json` profiles (development, preview APK, production AAB) and `app.config.ts` legal/support environment bindings configured.
-- **Rollout:** EAS project ID credentials, FCM V1 keys, and physical Android build generation pending.
+- **Rollout:** Completed. EAS project configured (@sipandey/mera-saarthi, project ID 5128596b-dc54-4eff-975e-73d3f6a17ab9), Android keystore provisioned, and preview APK build generated (Build #75c7004d-e66c-4925-a173-ba5dde7f8b6f).
 - **Code:** `eas.json`, `app.config.ts`, `package.json`.
 
 ### MS-18 — Privacy, support, and help surface
@@ -226,8 +226,8 @@ For combined states, the story has two independent parts: **Implementation** des
 
 - **Requirement / priority:** RQ-04, RQ-06, RQ-08; P0.
 - **Implementation:** Implemented. Baseline migration `20260930000100_initial_schema.sql` copies base schema into migration history; `20261006000200_operational_integrity_hardening.sql` enforces normalized registration uniqueness (P0-2), server-side availability hours check (P0-3), acceptance-time eligibility recheck (P0-4); and `20261006000300_initial_admin_bootstrap.sql` adds safe service-role initial admin promoter.
-- **Rollout:** Completed. All migrations deployed and remote migration ledger reconciled across 10 migrations. Initial admin bootstrap function ready for designated candidate UUID promotion.
-- **Code:** `supabase/migrations/20260930000100_initial_schema.sql`, `supabase/migrations/20261006000200_operational_integrity_hardening.sql`, `supabase/migrations/20261006000300_initial_admin_bootstrap.sql`.
+- **Rollout:** Completed. All 11 migrations deployed and remote migration ledger reconciled. Initial admin 918130380606 promoted and verified with fail-close protection against duplicate promotions.
+- **Code:** `supabase/migrations/20260930000100_initial_schema.sql`, `supabase/migrations/20261006000200_operational_integrity_hardening.sql`, `supabase/migrations/20261006000300_initial_admin_bootstrap.sql`, `supabase/migrations/20261006000500_bootstrap_initial_admin_fix.sql`.
 
 ### MS-21 — Evidence retention and push operations
 
@@ -239,8 +239,8 @@ For combined states, the story has two independent parts: **Implementation** des
 ### MS-22 — Release validation and Play closed pilot
 
 - **Requirement / priority:** RQ-01, RQ-10; P0.
-- **Implementation:** In progress. `eas-cli` installed, `eas.json` profiles configured.
-- **Rollout:** Execute initial admin account promotion, execute release scenario matrix, and build Android preview APK / Production AAB.
+- **Implementation:** In progress. `eas-cli` installed, `eas.json` profiles configured, preview APK generated.
+- **Rollout:** Execute release scenario matrix on physical Android hardware using preview APK build, then build production AAB for Play Console closed track.
 
 ## Shared release checklist for P0 stories
 
