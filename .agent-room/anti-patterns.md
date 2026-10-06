@@ -21,6 +21,12 @@ Append a new entry every time:
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-06 — do not equate a profile-delete trigger with account deletion
+
+**What happened:** The evidence-retention migration queued files from a profile-delete trigger, but profiles and owner vehicles with booking history cannot necessarily be deleted because booking foreign keys are restrictive. Booking snapshots would also retain names and trip places.
+**Root cause:** Account closure was designed around one table event instead of the full Auth, relational, snapshot, Storage, and audit lifecycle.
+**Avoid:** Implement account closure as an idempotent privileged workflow that first ends active access, queues evidence, and anonymizes retained records, then deletes relational and Auth identity.
+
 ### 2026-10-05 — scope owner evidence lookups by owner
 
 **What happened:** The demo owner dashboard chose the newest Aadhaar/selfie across all fixture owners because identity documents share a null vehicle ID. A different driver's evidence could appear in the selected owner's checklist.
