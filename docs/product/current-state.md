@@ -8,7 +8,7 @@
 | Area | Current behavior | Main implementation |
 |---|---|---|
 | Sign-in and demo entry | Phone/password Supabase sign-in/sign-up for customer or owner; no SMS confirmation flow; demo entry switches among customer, owner, and admin and persists local sample state | `App.tsx`, `src/supabase.ts`, `src/components/Primitives.tsx` |
-| Customer home and search | Local vs outstation; pickup text with Photon autocomplete and optional foreground location; manual pickup remains available; vehicle filter, date/time, local duration or outstation destination/duration | `src/screens/CustomerScreens.tsx`, `src/components/LocationPicker.tsx`, `App.tsx` |
+| Customer home and search | Local vs outstation; pickup and outstation destination use Photon autocomplete with manual entry; optional foreground location applies to pickup only; vehicle filter, date/time, local duration or outstation destination/duration | `src/screens/CustomerScreens.tsx`, `src/components/LocationPicker.tsx`, `App.tsx` |
 | Results and quote | Only eligible available cabs; local hourly/full-day quote; outstation saved one-way ₹/km rate, with final fare agreed directly; rate sort; no-results recovery; optional driver and vehicle photos | `src/components/CabCard.tsx`, `src/screens/CustomerScreens.tsx`, `App.tsx` |
 | Booking | Review screen, cash explanation, idempotent request attempt, server-confirmed success, booking status card, cancellation/rejection reasons, contact after acceptance via system dialer | `src/components/BookingConfirmation.tsx`, `src/components/BookingCard.tsx`, `App.tsx`, `src/cloudData.ts` |
 | Owner dashboard | Driver evidence checklist, opt-in selfie display switch, vehicle cards, required RC/insurance/PUC uploads, optional vehicle-photo upload and withdrawal, expiry fields, approval/availability state, rates/hours, booking actions, optional Android push setup | `src/screens/OwnerScreens.tsx`, `src/components/BookingCard.tsx`, `src/pushNotifications.ts`, `App.tsx` |
@@ -65,7 +65,7 @@ The database validates transitions, snapshots fare/vehicle/owner details, mainta
 | Ordered incremental schema/security changes | `supabase/migrations/*.sql` | Five local migrations at this snapshot; review/apply in timestamp order |
 | Raw evidence retention worker | `supabase/functions/purge-verification-files/` | Deletes eligible private files through Storage API; deploy, secret, schedule, and monitoring remain operator setup |
 | Booking notifications | `src/pushNotifications.ts`, `supabase/functions/send-booking-request/index.ts` | Expo token registration + secret-protected DB webhook target; requires external EAS/FCM/Supabase setup |
-| Place lookup | `src/components/LocationPicker.tsx` | Photon public service; internet-dependent and without a production SLA |
+| Place lookup | `src/components/LocationPicker.tsx` | Photon public service for pickup and outstation destination suggestions; internet-dependent and without a production SLA. Manual text remains valid; no coordinates or route are stored. |
 | Local persistence | AsyncStorage in `App.tsx` | Demo data only; cloud records are Supabase-backed |
 
 ### Local migrations at this snapshot

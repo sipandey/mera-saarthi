@@ -11,6 +11,7 @@
 3. Use the [epics and stories](../plans/prd-backlog-implementation.md) for acceptance criteria, implementation references, status, and demo evidence; use the [roadmap](../plans/prd-mvp-roadmap.md) for sequencing and release gates.
 4. Follow repository rules in `AGENTS.md`, `.agent-room/guardrails.md`, `.agent-room/decisions.md`, and `.agent-room/anti-patterns.md`.
 5. For release work, start with the [market-readiness audit](../research/2026-10-06-market-readiness-audit.md) and [EP-08 launch plan](../plans/2026-10-06-market-readiness-plan.md).
+6. For the current free map/geocoding assessment, see [map and place-search options](../research/2026-10-06-map-and-geocoding-options.md).
 
 ## Source-of-truth order
 

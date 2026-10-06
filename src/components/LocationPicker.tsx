@@ -31,6 +31,7 @@ export function LocationPicker({
   placeholder,
   t,
   hindi,
+  allowCurrentLocation = true,
 }: {
   label: string;
   value: string;
@@ -38,6 +39,7 @@ export function LocationPicker({
   placeholder: string;
   t: Translate;
   hindi: boolean;
+  allowCurrentLocation?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
@@ -157,10 +159,10 @@ export function LocationPicker({
         style={styles.input}
       />
       <Text style={styles.locationHelper}>{t('locationSearchHint')}</Text>
-      <Pressable accessibilityRole="button" disabled={gettingLocation} onPress={() => { void useCurrentLocation(); }} style={styles.locationButton}>
+      {allowCurrentLocation && <Pressable accessibilityRole="button" disabled={gettingLocation} onPress={() => { void useCurrentLocation(); }} style={styles.locationButton}>
         {gettingLocation ? <ActivityIndicator size="small" color={C.orange} /> : <Text style={styles.locationButtonIcon}>⌖</Text>}
         <Text style={styles.locationButtonText}>{gettingLocation ? t('locationFinding') : t('useCurrentLocation')}</Text>
-      </Pressable>
+      </Pressable>}
       {focused && value.trim().length >= 3 && (loadingSuggestions || suggestions.length > 0 || !!message) ? (
         <View style={styles.locationSuggestions}>
           {loadingSuggestions && <View style={styles.locationHint}><ActivityIndicator size="small" color={C.orange} /><Text style={styles.locationHelper}>{t('locationSearching')}</Text></View>}

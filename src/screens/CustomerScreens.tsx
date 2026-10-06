@@ -87,7 +87,7 @@ export function CustomerSearchContent({
         <View style={styles.twoCol}><FormField label={t('date')} value={date} onChange={setDate} placeholder={t('datePlaceholder')} /><FormField label={t('time')} value={time} onChange={setTime} placeholder={t('timePlaceholder')} /></View>
         <Text style={styles.fieldLabel}>{t('vehicle')}</Text><VehicleTypePicker current={vehicleType} onPick={setVehicleType} t={t} />
         {kind === 'local' ? <><Text style={styles.fieldLabel}>{t('hours')} · {t('fullDayThreshold')}</Text><View style={styles.quickRow}>{[2, 4, 8, 12].map((value) => <ChoiceChip key={value} label={`${value} ${t('hoursShort')}`} active={Number(hours) === value} onPress={() => setHours(`${value}`)} />)}</View></> : <>
-          <FormField label={t('destination')} value={destination} onChange={setDestination} placeholder={t('destinationPlaceholder')} />
+          <LocationPicker label={t('destination')} value={destination} onChange={setDestination} placeholder={t('destinationPlaceholder')} t={t} hindi={hindi} allowCurrentLocation={false} />
           <Text style={styles.helper}>{t('outstationDistanceNote')}</Text>
           <FormField label={t('estimatedTripDuration')} value={hours} onChange={setHours} placeholder="4" keyboardType="numeric" />
         </>}
