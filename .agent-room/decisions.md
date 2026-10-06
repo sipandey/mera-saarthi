@@ -16,6 +16,12 @@ have to re-derive it from scratch by reading git history.
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-06 — make EAS Android builds manual while on the free tier
+
+**Decision:** Trigger the Android production EAS build workflow only through GitHub Actions `workflow_dispatch`; do not start a paid cloud build automatically when `main` changes. Keep the existing build steps available for deliberate manual runs.
+**Why:** Automatic builds on every merge consume the project's limited free-tier build allocation. Manual dispatch lets the team choose when a production build is needed.
+**Rejected:** Removing the workflow entirely, because a manual production build remains useful when the team is ready to release.
+
 ### 2026-10-06 — trigger Android EAS production builds from main
 
 **Decision:** Use GitHub Actions on pushes to `main` to queue the existing EAS `production` Android build profile. Run Node.js 22, install project dependencies with `npm ci` before resolving app config plugins, enforce EAS CLI 24.11.0 in both `eas.json` and the action, authenticate through the repository Actions secret `EXPO_TOKEN`, submit to EAS without waiting for cloud completion, and do not submit automatically to Google Play.

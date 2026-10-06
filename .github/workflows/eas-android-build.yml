@@ -1,9 +1,7 @@
 name: EAS Android build
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,7 +11,7 @@ jobs:
     name: Build Android production app
     runs-on: ubuntu-latest
     steps:
-      - name: Check out main
+      - name: Check out selected ref
         uses: actions/checkout@v5
 
       - name: Set up Node.js
