@@ -65,7 +65,7 @@ Push alerts cost nothing to send through Expo's push service, but require an And
 
 1. Create or select the Expo/EAS project for this app, then set `EXPO_PUBLIC_EAS_PROJECT_ID` to its project ID in local and EAS build environments. The app config currently contains the project's ID as a fallback; replace it if the app is linked to a different EAS project.
 2. In Expo's EAS credentials, add the Android Firebase Cloud Messaging V1 service-account key for the same Firebase project as the Android app. Keep service-account JSON out of Git and out of app environment variables.
-3. Apply the reviewed migration chain to the target Supabase project, including `20261006000400_retention_cron_and_booking_webhook.sql`. Do not set up a second Database Webhook: that migration installs the `pg_net` booking-insert trigger, and configuring both would send duplicate alerts.
+3. Apply the reviewed migration chain to a new/staging project, including `20261006000400_retention_cron_and_booking_webhook.sql`. The configured Production project already records migrations through `20261006000500`; do not replay them. Do not set up a second Database Webhook: the migration installs the `pg_net` booking-insert trigger, and configuring both would send duplicate alerts.
 4. Set the Edge Function secret and deploy the function:
 
    ```sh
@@ -85,7 +85,8 @@ Push alerts cost nothing to send through Expo's push service, but require an And
    set secret = excluded.secret, updated_at = now();
    ```
 
-6. Build and install a development APK on a physical Android device (Expo Go cannot validate remote push). Sign in as an approved owner and enable booking alerts. Use a separate customer account to create a booking for that owner's approved, available vehicle. Confirm the notification arrives and tapping it opens the owner request list with that booking highlighted.
+6. In the Firebase project matching Android package `in.merasaarthi.cabs`, download its `google-services.json` and configure `android.googleServicesFile` in `app.config.ts` to point to that file. Its Firebase project number must match the sender project for the FCM V1 key uploaded in step 2. This client config can be committed; the service-account private-key JSON from step 2 must remain out of Git.
+7. Build and install a development APK on a physical Android device (Expo Go cannot validate remote push). Sign in as an approved owner and enable booking alerts. Use a separate customer account to create a booking for that owner's approved, available vehicle. Confirm the notification arrives and tapping it opens the owner request list with that booking highlighted.
 
 The notification contains only generic text and a booking UUID. A successful Expo push ticket means Expo accepted the message, not that Android displayed it. The sender removes tokens immediately when Expo returns `DeviceNotRegistered` in a push ticket; it does not yet persist tickets or poll asynchronous receipts, so inspect Expo receipts when diagnosing provider credential or delivery failures. Push failure never changes booking state.
 

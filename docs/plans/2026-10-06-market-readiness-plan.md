@@ -82,7 +82,7 @@ The detailed migration reconciliation and retention commands remain in [the EP-0
 
 1. Use a reviewed service-role-only bootstrap function to promote the previously approved existing account. The function must fail when any admin already exists and must not hardcode the phone number in source.
 2. Deploy the evidence-purge function with a Production-only secret, enable its daily schedule, and alert on invocation failures, missed runs, or queue entries at the retry limit.
-3. Configure booking push: EAS project ID, FCM V1 credentials, booking Edge Function secret, Database Webhook, and physical-device validation. If push is not reliable at release, make refresh/polling and operator expectations explicit; booking state must remain authoritative in Supabase.
+3. Configure booking push: the matching Firebase client config and EAS FCM V1 credential are now present; keep the Edge Function and private database secret aligned with the existing `pg_net` booking-insert trigger. Do not add a separate Database Webhook, which would dispatch each booking twice. Validate on a physical Android device with controlled test accounts. If push is not reliable at release, make refresh/polling and operator expectations explicit; booking state must remain authoritative in Supabase.
 4. Publish short operating procedures for document review, rejection reasons, account recovery/impersonation, deletion, booking incidents, admin removal, and retention-worker failures.
 
 ### 7. Pass the release scenario matrix

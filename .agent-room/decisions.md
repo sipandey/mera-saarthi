@@ -28,6 +28,12 @@ have to re-derive it from scratch by reading git history.
 **Why:** Two dispatch mechanisms for one booking produce duplicate owner alerts. A ticket's `ok` status means Expo accepted the payload, and a permanently unregistered token should not be retried for every booking.
 **Rejected:** Keeping both manual and SQL-managed webhooks, because operators could unknowingly send each booking twice; calling ticket acceptance delivery, because it does not confirm provider/device delivery.
 
+### 2026-10-06 — grant booking push only its required service-role table access
+
+**Decision:** Explicitly grant `service_role` SELECT on `vehicles`, `profiles`, and `push_tokens`, and DELETE on `push_tokens`, for the booking push Edge Function.
+**Why:** The function reads approval state and registered Expo tokens, and removes only tokens Expo reports as permanently unregistered. A fresh Supabase project had no table-level grants for `service_role`, causing all REST lookups to fail despite the server key bypassing RLS.
+**Rejected:** Granting broad table privileges or relying on implicit/default ACLs, because the function needs only the listed operations and the clean staging project demonstrated the defaults were insufficient.
+
 ### 2026-10-06 — trigger Android EAS production builds from main
 
 **Decision:** Use GitHub Actions on pushes to `main` to queue the existing EAS `production` Android build profile. Run Node.js 22, install project dependencies with `npm ci` before resolving app config plugins, enforce EAS CLI 24.11.0 in both `eas.json` and the action, authenticate through the repository Actions secret `EXPO_TOKEN`, submit to EAS without waiting for cloud completion, and do not submit automatically to Google Play.

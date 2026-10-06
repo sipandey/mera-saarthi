@@ -34,7 +34,7 @@ export function AppHeader({
         </Pressable>
       )}
       {signedIn && <Pressable accessibilityRole="button" accessibilityLabel={t('signOut')} onPress={onSignOut} style={styles.lang}><Text style={styles.langText}>{t('signOut')}</Text></Pressable>}
-      <Pressable accessibilityRole="button" accessibilityLabel={t('switchToEnglish')} onPress={onToggleLanguage} style={styles.lang}><Text style={styles.langText}>{t('language')}</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={t(hindi ? 'switchToEnglish' : 'switchToHindi')} onPress={onToggleLanguage} style={styles.lang}><Text style={styles.langText}>{t('language')}</Text></Pressable>
     </View>
   );
 }

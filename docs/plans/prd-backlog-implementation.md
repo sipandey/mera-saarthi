@@ -182,12 +182,12 @@ For combined states, the story has two independent parts: **Implementation** des
 ### MS-04 — Notify an opted-in owner of a new request
 
 - **Requirement / priority:** RQ-09; P0 for the configured push path, but delivery is best-effort and not a booking correctness dependency.
-- **Implementation:** Android client registration, the `pg_net` booking INSERT trigger, server-side eligibility checks, Expo ticket handling, invalid-token cleanup, opt-in/out, and tap routing exist. **Rollout:** Verify the trigger migration is applied; configure the EAS project/FCM V1, matching Edge Function and private-schema secrets; deploy the function; and validate on a physical Android device. Do not configure a second Database Webhook.
+- **Implementation:** Android client registration, the `pg_net` booking INSERT trigger, server-side eligibility checks, Expo ticket handling, invalid-token cleanup, opt-in/out, and tap routing exist. **Rollout:** The configured Production project's migration ledger includes the push trigger migration; the trigger is enabled; `send-booking-request` is deployed (version 2); and the private URL and matching shared secret are verified. `google-services.json` resolves in Expo config, and EAS lists an FCM V1 service-account key. A fresh local release build processed the Firebase config and launched on the Pixel 7 API 35 emulator; authenticated push delivery and physical-device validation remain pending. Do not configure a second Database Webhook.
 - **User story:** As an opted-in owner, I want a generic alert for a new request and a tap target that opens that request.
 - **Acceptance criteria:** Owner explicitly enables or disables alerts; token is registered/removed appropriately, including invalid tokens; the database trigger/function sends only after rechecking eligibility; notification uses generic content and a booking UUID; tap navigates to the relevant request; notification failure never changes booking state; secrets remain server-side.
 - **Demo path:** Demo may show booking arrival in the owner list; it does not send an Expo push. Live path requires installed development/store build (not Expo Go).
 - **Code:** `src/pushNotifications.ts`, `supabase/functions/send-booking-request/index.ts`, `App.tsx`, README setup.
-- **Release check:** Complete the EAS/FCM/function/trigger setup and verify token, Expo ticket/receipt behavior, permissions, stale-token cleanup, opt-out, and tap routing on Android. Expo ticket acceptance alone does not prove device delivery.
+- **Release check:** With the EAS FCM V1 credential in place, verify owner token registration, Expo ticket/receipt behavior, permissions, stale-token cleanup, opt-out, and tap routing on a physical Android device with controlled test accounts. Expo ticket acceptance alone does not prove device delivery.
 
 ## EP-07 — Learn and expand deliberately
 
