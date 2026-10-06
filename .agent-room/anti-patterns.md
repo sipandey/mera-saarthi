@@ -21,6 +21,12 @@ Append a new entry every time:
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-06 — match the EAS runner Node version to its CLI dependencies
+
+**What happened:** The Android EAS workflow failed before starting a build because `@oclif/plugin-autocomplete@3.3.0` requires Node.js 22 or newer, while the runner used Node.js 20.19.4.
+**Root cause:** The workflow's runtime was selected without checking the installed EAS CLI dependency engine requirements.
+**Avoid:** Keep the GitHub Actions Node.js runtime at 22 for the pinned EAS CLI and recheck engine requirements when changing the EAS CLI version.
+
 ### 2026-10-06 — do not parse client dates without explicit timezone offset
 
 **What happened:** Database slot triggers evaluate pickup hours using `(pickup_at AT TIME ZONE 'Asia/Kolkata')::time`, but client dates constructed from strings like `new Date(`${date}T${time}:00`)` parsed in the device's local timezone. On devices running in UTC or non-IST timezones, pickup times drifted by 5.5+ hours and caused false `check_booking_slot` rejections.
