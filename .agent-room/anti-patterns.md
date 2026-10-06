@@ -21,6 +21,12 @@ Append a new entry every time:
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-06 — install app dependencies before EAS resolves config plugins
+
+**What happened:** The GitHub Actions EAS build failed to resolve the `expo-location` config plugin because the runner invoked EAS before installing the app's npm dependencies.
+**Root cause:** The workflow installed the EAS CLI but skipped the repository's lockfile-based `npm ci` step.
+**Avoid:** Run `npm ci` before `eas build` so local Expo packages and config plugins are available when EAS evaluates the project.
+
 ### 2026-10-06 — match the EAS runner Node version to its CLI dependencies
 
 **What happened:** The Android EAS workflow failed before starting a build because `@oclif/plugin-autocomplete@3.3.0` requires Node.js 22 or newer, while the runner used Node.js 20.19.4.

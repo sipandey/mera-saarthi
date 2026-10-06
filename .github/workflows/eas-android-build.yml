@@ -20,6 +20,10 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
+          cache: npm
+
+      - name: Install project dependencies
+        run: npm ci
 
       - name: Check Expo token is configured
         env:
