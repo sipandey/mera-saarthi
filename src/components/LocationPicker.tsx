@@ -104,11 +104,30 @@ export function LocationPicker({
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const { latitude, longitude } = position.coords;
       setBias([longitude, latitude]);
-      const params = new URLSearchParams({ lat: String(latitude), lon: String(longitude), lang: hindi ? 'hi' : 'en' });
-      const response = await fetch(`https://photon.komoot.io/reverse?${params.toString()}`);
-      if (!response.ok) throw new Error('Address lookup unavailable');
-      const data = await response.json() as { features?: Feature[] };
-      const address = data.features?.map(placeLabel).find(Boolean);
+      let address: string | undefined;
+      try {
+        const params = new URLSearchParams({ lat: String(latitude), lon: String(longitude), lang: hindi ? 'hi' : 'en' });
+        const response = await fetch(`https://photon.komoot.io/reverse?${params.toString()}`);
+        if (response.ok) {
+          const data = await response.json() as { features?: Feature[] };
+          address = data.features?.map(placeLabel).find(Boolean);
+        }
+      } catch {
+        // Fall back to native reverse geocoding below
+      }
+      if (!address) {
+        try {
+          const nativePlaces = await Location.reverseGeocodeAsync({ latitude, longitude });
+          if (nativePlaces && nativePlaces.length > 0) {
+            const p = nativePlaces[0];
+            const street = [p.streetNumber, p.street].filter(Boolean).join(' ');
+            const locality = p.district || p.subregion || p.city;
+            address = [...new Set([p.name, street, locality, p.region, p.country].filter(Boolean))].join(', ');
+          }
+        } catch {
+          // Both lookups failed
+        }
+      }
       if (address) {
         onChange(address);
         setFocused(false);

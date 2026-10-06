@@ -99,7 +99,7 @@ export function HelpPrivacyScreen({
           style={localStyles.actionButton}
         >
           <Text style={localStyles.actionButtonText}>
-            {supportPhone ? 'Call Support' : 'Email Support'}
+            {supportPhone ? t('callSupport') : t('emailSupport')}
           </Text>
         </Pressable>
       </View>
