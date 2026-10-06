@@ -38,6 +38,10 @@ Provision the first admin through the reviewed operator procedure after confirmi
 
 For an EAS/store build, configure `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` as EAS environment variables too.
 
+## Automated Android builds
+
+Every push to `main` (including merged pull requests) triggers a production Android App Bundle build on EAS. It does not submit the build to Google Play. Before the workflow can run, add an Expo access token as the repository Actions secret `EXPO_TOKEN` in GitHub → Settings → Secrets and variables → Actions. Create the token in your Expo account's access-token settings and keep its value out of source control. The workflow queues the cloud build and exits without waiting for EAS to finish; check the EAS dashboard for build completion.
+
 The SQL defines profiles, vehicles, bookings, cash-only payment, customer/owner/admin policies, owner and vehicle review, booking expiry, status history, device push tokens, and privacy-limited pilot metrics. A new cloud signup is set to customer or owner from the role chosen in the app; admin cannot be self-selected. Without phone confirmation, people can sign up using a phone number they do not own.
 
 Drivers submit a private Aadhaar identity file and a selfie; each vehicle needs a registration certificate, current insurance, and current PUC certificate. Admins review each latest file, choose a reason when requesting a replacement, approve the driver, approve each vehicle, and then the owner turns availability on. Replacing a reviewed file or changing a registration number sends the affected approval back to review; after a registration change, the RC must be uploaded again. Expired insurance or PUC files immediately remove that vehicle from search and booking until replaced and reapproved.
