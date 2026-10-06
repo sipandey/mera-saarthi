@@ -63,17 +63,38 @@ Verification files are intended for a private Supabase Storage bucket. Admin fil
 
 Push alerts cost nothing to send through Expo's push service, but require an Android development/store build and Firebase Cloud Messaging credentials. Expo Go is not suitable for validating Android push notifications.
 
-1. Create or select an Expo/EAS project, then set `EXPO_PUBLIC_EAS_PROJECT_ID` to its project ID in the app's local and EAS build environments.
+1. Create or select the Expo/EAS project for this app, then set `EXPO_PUBLIC_EAS_PROJECT_ID` to its project ID in local and EAS build environments. The app config currently contains the project's ID as a fallback; replace it if the app is linked to a different EAS project.
 2. In Expo's EAS credentials, add the Android Firebase Cloud Messaging V1 service-account key for the same Firebase project as the Android app. Keep service-account JSON out of Git and out of app environment variables.
-3. Set up the Supabase function secrets from the Supabase project directory:
+3. Apply the reviewed migration chain to the target Supabase project, including `20261006000400_retention_cron_and_booking_webhook.sql`. Do not set up a second Database Webhook: that migration installs the `pg_net` booking-insert trigger, and configuring both would send duplicate alerts.
+4. Set the Edge Function secret and deploy the function:
 
    ```sh
    supabase secrets set BOOKING_PUSH_WEBHOOK_SECRET="<long-random-secret>"
    supabase functions deploy send-booking-request --no-verify-jwt
    ```
 
-   `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are available to Supabase Edge Functions by default. The service-role key must remain server-side. The function disables gateway JWT verification because Database Webhooks do not send a user JWT; its required shared secret is the endpoint authentication.
-4. In Supabase Database Webhooks, create a webhook on `public.bookings` for **INSERT**. Set its URL to `https://<project-ref>.supabase.co/functions/v1/send-booking-request` and add the header `x-booking-webhook-secret` with the same random secret used above. The function ignores non-pending inserts and rechecks that the owner and vehicle are approved and unblocked.
-5. Build and install a development APK, sign in as an approved owner, and enable booking notifications on the owner dashboard. Submit a booking from a separate customer account and tap the notification to open the request.
+   `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are available to Edge Functions by default. The service-role key must remain server-side. The function disables gateway JWT verification because the database trigger authenticates with the shared header secret.
+5. In the Supabase SQL Editor, store the Edge Function base URL and the same random secret in the private schema. Replace both placeholders; never commit this SQL with real values:
 
-The notification contains only a generic message and booking ID. Expo's push gateway can accept a message even if Android later cannot display it; review EAS/Expo delivery receipts and Android notification permissions during device validation. Push failure never changes the booking's server state.
+   ```sql
+   insert into private.service_secrets (name, secret)
+   values
+     ('edge_function_base_url', 'https://<project-ref>.supabase.co/functions/v1'),
+     ('booking_push_webhook_secret', '<same-long-random-secret>')
+   on conflict (name) do update
+   set secret = excluded.secret, updated_at = now();
+   ```
+
+6. Build and install a development APK on a physical Android device (Expo Go cannot validate remote push). Sign in as an approved owner and enable booking alerts. Use a separate customer account to create a booking for that owner's approved, available vehicle. Confirm the notification arrives and tapping it opens the owner request list with that booking highlighted.
+
+The notification contains only generic text and a booking UUID. A successful Expo push ticket means Expo accepted the message, not that Android displayed it. The sender removes tokens immediately when Expo returns `DeviceNotRegistered` in a push ticket; it does not yet persist tickets or poll asynchronous receipts, so inspect Expo receipts when diagnosing provider credential or delivery failures. Push failure never changes booking state.
+
+### Push notification test checklist
+
+1. **Configuration:** Confirm the installed app was built for this EAS project after FCM V1 credentials were added. Confirm the function is deployed with `--no-verify-jwt`, `BOOKING_PUSH_WEBHOOK_SECRET` matches the private database secret, the Edge Function URL is correct, and the trigger exists on `public.bookings`.
+2. **Opt-in and token:** On the physical owner device, allow Android notifications and enable alerts in the owner dashboard. In Supabase, verify one `push_tokens` row exists for the signed-in owner. Turn alerts off and verify that row is removed; turn them back on for subsequent checks.
+3. **Foreground delivery:** Keep the owner's app open, create a pending booking from another customer account, and verify the generic alert appears. Tap it and verify the matching request is brought to the top of the owner's list.
+4. **Background and closed-app delivery:** Repeat with the owner app in the background, then swipe it away from the recent-apps view. Verify Android displays the alert and tapping it opens the matching request. Confirm the booking remains correct if the notification is delayed or absent; refreshing the app must still show the booking.
+5. **Eligibility and privacy:** Try with a pending/rejected or blocked owner/vehicle and confirm no notification is sent. Inspect the notification tray and confirm it contains no customer name, phone, pickup, destination, or fare.
+6. **Failure behavior:** Temporarily use an invalid FCM credential in a non-production test project, submit a booking, and verify the booking succeeds even though push fails. Restore the credential and use Expo push tickets/receipts to diagnose the failure. Never test credential failure against production.
+7. **Stale token:** In a non-production project, register a test Expo token that the Expo push service reports as `DeviceNotRegistered`, send a booking request, and verify that token is removed from `push_tokens` while other devices for the owner remain registered.

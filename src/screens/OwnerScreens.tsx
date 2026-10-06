@@ -25,6 +25,7 @@ export function OwnerDashboardContent({
   onToggleAvailability,
   onChangeStatus,
   onEnablePush,
+  onDisablePush,
   documents,
   onUploadDocument,
   onWithdrawVehiclePhoto,
@@ -51,6 +52,7 @@ export function OwnerDashboardContent({
   onToggleAvailability: (cabId: string, available: boolean) => void;
   onChangeStatus: (id: string, status: Booking['status']) => void;
   onEnablePush: () => void;
+  onDisablePush: () => void;
   documents: VerificationDocument[];
   onUploadDocument: (type: DocumentType, vehicleId: string | null) => void;
   onWithdrawVehiclePhoto: (document: VerificationDocument) => void;
@@ -81,7 +83,7 @@ export function OwnerDashboardContent({
         {(['aadhaar', 'selfie'] as DocumentType[]).map((type) => <EvidenceRow key={type} type={type} document={latestDocument(documents, currentOwnerId, type, null)} t={t} onUpload={() => onUploadDocument(type, null)} />)}
         <View style={styles.photoConsentRow}><View style={{ flex: 1 }}><Text style={styles.cabMeta}>{t('showDriverPhoto')}</Text><Text style={styles.bookingHelper}>{t('driverPhotoConsent')}</Text></View><Switch accessibilityLabel={t('showDriverPhoto')} value={showDriverPhoto} onValueChange={onToggleDriverPhoto} trackColor={{ true: C.green }} /></View>
       </View>
-      {ownerReviewStatus === 'approved' && <View style={styles.summaryPanel}><Text style={styles.summaryTitle}>{t(pushState === 'ready' ? 'pushReady' : pushState === 'idle' ? 'pushNotEnabled' : pushState === 'setting_up' ? 'pushSettingUp' : pushState === 'permission_denied' ? 'pushPermissionDenied' : pushState === 'unsupported' ? 'pushUnsupported' : pushState === 'needs_project' ? 'pushNeedsProject' : 'pushFailed')}</Text>{['idle', 'permission_denied', 'error'].includes(pushState) && <Pressable accessibilityRole="button" onPress={onEnablePush}><Text style={styles.confirmationEditText}>{t('enableAlerts')}</Text></Pressable>}</View>}
+      {ownerReviewStatus === 'approved' && <View style={styles.summaryPanel}><Text style={styles.summaryTitle}>{t(pushState === 'ready' ? 'pushReady' : pushState === 'idle' ? 'pushNotEnabled' : pushState === 'setting_up' ? 'pushSettingUp' : pushState === 'permission_denied' ? 'pushPermissionDenied' : pushState === 'unsupported' ? 'pushUnsupported' : pushState === 'needs_project' ? 'pushNeedsProject' : 'pushFailed')}</Text>{['idle', 'permission_denied', 'error'].includes(pushState) && <Pressable accessibilityRole="button" onPress={onEnablePush}><Text style={styles.confirmationEditText}>{t('enableAlerts')}</Text></Pressable>}{pushState === 'ready' && <Pressable accessibilityRole="button" onPress={onDisablePush}><Text style={styles.confirmationEditText}>{t('disableAlerts')}</Text></Pressable>}</View>}
       <View style={styles.sectionLine}><Text style={styles.sectionTitle}>{t('myVehicle')}</Text><Pressable accessibilityRole="button" onPress={onAddVehicle}><Text style={styles.addLink}>＋ {t('addVehicle')}</Text></Pressable></View>
       {owned.map((cab) => { const lastUpdated = cab.availabilityUpdatedAt ? new Date(cab.availabilityUpdatedAt).getTime() : 0; const stale = lastUpdated > 0 && Date.now() - lastUpdated > 86400000; const evidenceReady = requiredVerificationDocumentsApproved(documents, cab.ownerId, cab.id, ['registration', 'insurance', 'pollution'], cab.registrationUpdatedAt); const identityReady = requiredVerificationDocumentsApproved(documents, cab.ownerId, null, ['aadhaar', 'selfie']); return <View key={cab.id} style={styles.ownerCab}>
         <View style={styles.ownerCabTop}><View style={styles.carIcon}><Text style={styles.carIconText}>🚕</Text></View><View style={{ flex: 1 }}><Text style={styles.cabName}>{cab.name}</Text><Text style={styles.cabMeta}>{t(`vehicle${cab.type}`)} · {cab.seats} {t('seats')}</Text><Text style={styles.cabMeta}>{t('vehicleRegistration')}: {cab.registrationNumber || '—'}</Text><Text style={styles.availabilityLabel}>{cab.reviewStatus === 'approved' ? (cab.available ? t('cabAvailable') : t('cabUnavailable')) : cab.reviewStatus === 'rejected' ? t('vehicleApprovalRejected') : t('vehicleApprovalPending')}</Text>{(cab.availabilityStart && cab.availabilityEnd) && <Text style={styles.cabMeta}>{cab.availabilityStart.slice(0, 5)}–{cab.availabilityEnd.slice(0, 5)}</Text>}{cab.availabilityUpdatedAt && <Text style={styles.cabMeta}>{t('lastUpdated')} {cab.availabilityUpdatedAt.slice(0, 16).replace('T', ' ')}</Text>}</View><Switch accessibilityLabel={t('availability')} value={cab.available} disabled={cab.available ? false : cab.reviewStatus !== 'approved' || ownerReviewStatus !== 'approved' || !evidenceReady || !identityReady} onValueChange={(value) => onToggleAvailability(cab.id, value)} trackColor={{ true: C.green }} />
