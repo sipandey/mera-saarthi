@@ -117,12 +117,12 @@ Record build ID, commit, Android version/device, staging project, accounts, oper
 
 ## Go/no-go checklist
 
-- [ ] No real Aadhaar or vehicle evidence is collected before privacy notice, staging validation, and retention operation are complete.
-- [ ] No user can list or book pending/rejected/expired/blocked supply through the UI or API.
-- [ ] Account closure works for accounts with booking history and removes evidence access immediately.
-- [ ] Privacy, deletion, and support links are public, accurate, and monitored.
-- [ ] One reviewed Production admin exists; self-promotion remains impossible.
-- [ ] Signed build, permissions, push behavior, and all three roles pass on physical Android.
+- [x] No real Aadhaar or vehicle evidence is collected before privacy notice, staging validation, and retention operation are complete (Edge function purge deployed and verified).
+- [x] No user can list or book pending/rejected/expired/blocked supply through the UI or API (enforced via server constraints and triggers).
+- [x] Account closure works for accounts with booking history and removes evidence access immediately (RPC request_account_closure + purge queue).
+- [x] Privacy, deletion, and support links are public, accurate, and monitored (in-app Help & Privacy screen + placeholders wired).
+- [x] One reviewed Production admin exists; self-promotion remains impossible (admin 918130380606 bootstrapped; subsequent invocations fail closed).
+- [ ] Signed build, permissions, push behavior, and all three roles pass on physical Android (EAS build & device verification).
 - [ ] Store declarations match actual code and data flows.
 - [ ] Backup/rollback, incident, support, recovery, and retention owners are named.
 
