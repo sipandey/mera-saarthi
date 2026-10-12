@@ -102,16 +102,16 @@ A new isolated Supabase staging project was created in the SP Free organization,
 | Check | Result | Evidence |
 |---|---|---|
 | Staging database initialization | Pass | `supabase db push` applied the baseline plus all 11 subsequent migrations through `20261006000600`; no seed data was applied. |
-| Expo staging config | Pass | `npx expo config` resolved `https://qndrhjmomkykrcloxvfd.supabase.co`, package `in.merasaarthi.cabs`, and verified the embedded key equals the staging publishable key. |
-| Staging release build | Pass | `npx expo prebuild --platform android --no-install` and `./gradlew :app:assembleRelease` completed with the staging URL and key explicitly selected. |
-| Emulator install and startup | Pass | Installed on `emulator-5554` (`Pixel_7_API_35`) and opened `in.merasaarthi.cabs/.MainActivity`; the Hindi sign-in screen rendered. |
+| Expo staging config | Metadata pass only | `npx expo config` resolved `https://qndrhjmomkykrcloxvfd.supabase.co`, package `in.merasaarthi.cabs`, and a staging key in Expo metadata. This did not verify the build-time `process.env` values used by `src/supabase.ts`; the 7 Oct APK bundle audit found the Production project ref. |
+| Staging release build | Build succeeded; target invalidated by bundle audit | `npx expo prebuild --platform android --no-install` and `./gradlew :app:assembleRelease` completed, and Expo metadata contained staging URL/key. A 7 Oct audit found the installed JS bundle instead embeds the Production project ref, so this APK cannot be used as a staging build. |
+| Emulator install and startup | Pass; backend target mismatch | Installed on `emulator-5554` (`Pixel_7_API_35`) and opened `in.merasaarthi.cabs/.MainActivity`; the Hindi sign-in screen rendered. The screen launch did not prove the runtime backend target. |
 | Staging Auth reachability | Pass | Submitted synthetic invalid login values; the app returned “Invalid login credentials.” No account was created. |
 | Anonymous REST permissions | Pass | A request with the staging publishable key to a protected `vehicles` query returned HTTP 401 / PostgreSQL `42501`, with `SELECT` denied for `anon`, as expected for the service-role-only lookup. |
 | Staging function and trigger config | Pass | `send-booking-request` was deployed from checked-in source using the replacement staging PAT with `--no-verify-jwt`; its staging-only secret and function URL are configured in Edge Function secrets and `private.service_secrets`. The database trigger uses the custom webhook header. |
 | Staging function invocation | Pass | After migration `20261006000600`, a synthetic pending booking with a nonexistent vehicle returned HTTP 200 `{"delivered":0,"skipped":true}`. ACL verification confirmed `service_role` SELECT on `profiles`, `vehicles`, and `push_tokens`, and DELETE only on `push_tokens`. |
 | End-to-end owner push | Not run | Requires a healthy deployed function, a synthetic approved owner/device token, and a synthetic booking. No owner account or booking was created. |
 
-**Scope of this pass:** The emulator now runs an APK configured for staging, and both staging and Production have the full checked-in migration chain. Auth reachability does not validate booking flows; the synthetic function response verifies its lookup and skip path only. End-to-end owner push still requires a controlled approved owner, device token, and booking. The earlier “no cloud sign-in / disposable project” note above describes the original demo-mode run; this follow-up checked staging Auth and expected anonymous table denial. The production rollout applied only the new permission migration; no production records were modified.
+**Scope of this pass:** The migration chain and staging function checks were performed against staging. The first 7 Oct emulator APK had staging metadata but a Production JavaScript bundle, so its UI Auth result is not staging evidence; it was replaced by the corrected staging APK documented below. The earlier invalid-login app check is also not reliable staging Auth evidence. The synthetic function response verifies its lookup and skip path only. The production rollout changed database grants/history only; no user records were changed by that migration.
 
 ## Production permission migration — 6 Oct 2026
 
@@ -120,3 +120,58 @@ A new isolated Supabase staging project was created in the SP Free organization,
 | Production ACL precheck | Pass | Before applying the migration, `service_role` already had effective SELECT access on `profiles`, `vehicles`, and `push_tokens`, and DELETE access on `push_tokens`. |
 | Pending migration review | Pass | `supabase migration list` showed only `20261006000600_booking_push_service_role_permissions.sql` pending; `supabase db push --dry-run` confirmed no other changes would be applied. |
 | Production migration | Pass | `supabase db push` applied `20261006000600`; migration ledger is now aligned through this migration. It adds explicit grants for the function's required operations; no app data was changed. |
+
+## Staging release-matrix setup — 7 Oct 2026
+
+| Check | Result | Evidence |
+|---|---|---|
+| Pixel 7 emulator readiness | Pass | `Pixel_7_API_35` is running Android 15/API 35 with Google Play Services, and Mera Saarthi 1.0.0 is installed. |
+| Runtime backend target | Pass after rebuild | The previous APK had Production ref `pgmbbtuphpfcjrswptzs`. The rebuilt release bundle contains staging ref `qndrhjmomkykrcloxvfd` and no Production ref; staging Expo config resolves the same host. |
+| Release build and install | Pass | `./gradlew :app:assembleRelease` completed with staging variables explicitly loaded; the 67 MB APK installed and launched on `emulator-5554` (`Pixel_7_API_35`). |
+| Phone/password signup and login | Pass | With staging phone confirmations temporarily disabled, synthetic `QACustomer` and `QAOwner` accounts signed up without OTP. Owner phone/password sign-in succeeded. Staging phone confirmations were restored after account creation and testing. |
+| Staging account persistence | Pass | Staging SQL Editor count query returned 2 `auth.users`, 2 `public.profiles`, and 0 `public.vehicles`; the Auth Users page showed both synthetic phone users. |
+| Customer pickup autocomplete | Pass | Searching “Delhi” returned three Photon/OpenStreetMap suggestions, including “Delhi, India”; selecting the result populated the pickup field. |
+| Availability search | Pass / no inventory | The app advanced to Trip details and the search returned “0 cabs found” / “No cabs found for this time” for Delhi at the selected time. No booking was submitted. |
+| Owner onboarding gate | Pass | Owner dashboard displayed “Your owner account is waiting for admin approval,” zero ride requests, and Aadhaar/selfie not submitted. Toggling selfie display returned “Upload and receive approval for a current selfie before displaying it.” The setting remained off. |
+| Approval-dependent booking and push | Not run | Staging has no vehicle, approved owner, approved documents, or device push token. Admin provisioning/approval is needed before these paths can be tested safely. No staging booking, vehicle, identity document, push token, SMS, or notification was created or sent. |
+| Earlier Production-targeted test accounts | Cleanup deferred by user | The two synthetic Production accounts/profile rows remain pending the user's later cleanup decision. No further Production requests or changes were made during this staging pass. |
+
+**Staging Auth after QA:** Phone provider enabled, phone confirmations enabled, and email confirmation disabled. Phone confirmations were temporarily disabled only to create the two test accounts; the Twilio provider still has placeholder credentials, so phone confirmation signup will continue to fail until valid staging SMS credentials are configured.
+
+**Next action:** Provision an isolated staging admin and approved synthetic owner/vehicle fixture before testing document review, booking creation, owner push registration, and booking notifications. Keep Production cleanup deferred.
+
+## Staging admin and document-review follow-up — 7 Oct 2026
+
+| Check | Result | Evidence |
+|---|---|---|
+| Staging admin provisioning and sign-in | Pass | Created a synthetic admin in `mera-saarthi-staging` through the existing fail-closed `bootstrap_initial_admin` function. Phone/password sign-in reached the admin dashboard. Phone confirmation settings were not changed. |
+| Synthetic vehicle creation | Pass | The signed-in `QAOwner` created one clearly named QA SUV with synthetic registration text. It remains unavailable pending verification. |
+| Private evidence upload | Pass for non-person documents | Uploaded visibly watermarked QA-only placeholders for Aadhaar, RC, insurance, and PUC via the owner app and Android document picker. Insurance and PUC use a future expiry date. No genuine identity or vehicle document data was used. |
+| Admin document review | Partial | The admin queue displayed the staging documents. RC, insurance, and PUC were approved in the dashboard; Aadhaar remains pending. These approvals only exercise staging workflow and do not represent valid real-world evidence. |
+| Selfie evidence and owner approval | Blocked | The owner selfie control opens the camera. An emulator-camera preview was discarded without submission after the approval review flagged possible biometric content. Owner and vehicle remain pending because the required approved selfie is missing. |
+| Booking and push delivery | Not run | With owner/vehicle ineligible, the app offers no bookable vehicle and push registration remains unavailable. No booking, owner push token, SMS, or notification was created/sent. |
+
+The staging setup remains isolated; no Production project or records were changed. The 12 Oct follow-up below records the approved static placeholder and the subsequent booking and push checks.
+
+## Staging approval, booking, and push follow-up — 12 Oct 2026
+
+**Target:** staging project `qndrhjmomkykrcloxvfd` and the staging release APK on `Pixel_7_API_35` (Android 15/API 35). All account, vehicle, evidence, and booking records in this section are synthetic. No Production calls or records were changed.
+
+| Check | Result | Observed evidence |
+|---|---|---|
+| Static selfie-slot fixture | Pass for the review gate; camera flow not exercised | Created a PNG with the visible text `SYNTHETIC QA / NO PERSON / SELFIE SLOT TEST / STAGING ONLY / NOT IDENTITY EVIDENCE`. Uploaded it to the private staging `verification-documents` bucket and inserted a pending `selfie` record. This fixture was seeded through staging APIs/SQL, not through the app camera. No person image was submitted. |
+| Document, owner, vehicle review | Pass in staging | Admin app approved the synthetic selfie and Aadhaar; RC, insurance, and PUC were already approved. The owner and SUV approval buttons became enabled and both were approved. Staging now has five approved verification records, one approved owner, and one approved vehicle. These synthetic approvals do not establish real identity or vehicle validity. |
+| Owner sign-in and availability | Pass | Reset only the two synthetic QA account passwords to random temporary values in a mode-600 `/tmp` file. Owner phone/password login worked. The approved SUV's availability switch changed to “Cab available”; the customer app and `available_vehicles` then showed one vehicle. |
+| Push permission and opt-in | Pass | Android displayed the notification permission prompt; after Allow, the owner screen showed “Booking alerts are on for this phone” and staging held one `push_tokens` row. No token was printed in the report. |
+| Controlled customer API booking | Pass | Authenticated as the synthetic customer while the owner remained signed in on the emulator. `available_vehicles` returned one SUV. A future two-hour local booking inserted as pending at a server-calculated ₹440 cash estimate, with owner/vehicle name snapshots. A second request for the same slot was rejected with “This cab already has a booking around that time.” |
+| Booking push function and device alert | Pass for manual dispatch and emulator display | Invoked the staging `send-booking-request` function for that booking through its configured secret header. It returned `{"accepted":1,"attempted":1,"staleTokensRemoved":0}`. Android displayed the “New ride request” notification. Tapping it opened the owner view; scrolling to the request showed “Opened the booking request from your notification” and the matching booking at the top. Expo ticket acceptance alone is not a delivery receipt; the visible Android notification supplies separate device evidence. |
+| Automatic database-trigger dispatch | Unverified | No notification was observed before the controlled manual function invocation, and `net._http_response` had no retained rows when inspected. This run proves the function and device path, not that booking INSERT autonomously dispatched a push. Investigate the staging `pg_net` trigger/worker and function logs before treating this as a release pass. |
+| Owner acceptance and contact release | Pass | The owner accepted the pending booking in the app. Staging audit history recorded `pending → accepted`; both owner and customer screens showed “Booking confirmed.” The accepted customer view exposed the driver call action, and the authenticated `get_booking_driver_contact` RPC returned a contact. No call was placed. |
+| Customer cancellation and audit | Pass | The customer selected “Plans changed” in the app. Status became `cancelled`, the call action disappeared, and history recorded `accepted → cancelled` with `reasonPlansChanged`. |
+| Owner push opt-out | Pass | “Turn off booking alerts on this phone” removed the staging push token; final token count is zero. |
+| Live customer UI booking | Pass | Customer manually entered `QAMarket`; Photon returned “No places found” while preserving the manual fallback. Trip details for 13 Oct 09:00/4 hours found one verified SUV at ₹220/hour and ₹880 estimated cash fare. The review screen matched those details, and submitting showed “Booking request received.” A later refresh displayed “No reply in time”; staging history recorded `pending → expired` with `system_expiry`. |
+| Same request-key retry | **Fail — booking idempotency** | Repeating an otherwise identical booking INSERT immediately with the same `request_key` returned PostgreSQL `P0001`, “This cab already has a booking around that time,” instead of the existing booking. `createCloudBooking` retries only on unique-violation `23505`, so this conflict order defeats its intended idempotent recovery. The test booking was cancelled afterward. |
+
+**Final staging state:** one approved and available synthetic SUV; five approved synthetic document records; zero push tokens after opt-out; zero pending bookings. The three QA bookings are two cancelled and one expired. Phone confirmation remained enabled. Test account passwords and the local admin credential file remain in mode-600 `/tmp` files and are not committed.
+
+**Still not established by this emulator pass:** a real-person selfie camera upload and genuine identity review, automatic booking-trigger push dispatch, an Expo delivery receipt, push on a physical Android device, production backend parity, SMS delivery, and the broader offline/concurrency/security matrix. Automatic approval review rejected a separate direct Expo receipt probe because it would export the device token and booking ID to Expo without specific authorization; no direct probe was sent.
