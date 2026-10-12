@@ -21,6 +21,18 @@ Append a new entry every time:
 
 <!-- Entries go below this line, newest first. -->
 
+### 2026-10-12 — check idempotency before the slot-conflict guard
+
+**What happened:** Retrying a pending booking INSERT with its original `request_key` returned `P0001` (“This cab already has a booking around that time”) rather than the existing booking. The client catches only `23505` to recover by request key.
+**Root cause:** The `check_booking_slot` BEFORE INSERT trigger detects overlap with the first pending request before the unique constraint on `request_key` can report a duplicate.
+**Avoid:** Resolve an existing request key before checking slot overlap, or let the client look up that key after either conflict while preserving the normal overlap rejection for a distinct key.
+
+### 2026-10-07 — keep Supabase client key aliases consistent
+
+**What happened:** The staging environment provided `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which Expo config already accepted, but the bundled Supabase client read only `EXPO_PUBLIC_SUPABASE_ANON_KEY`. A staging build could therefore report staging metadata while its runtime client was sourced from another dotenv file.
+**Root cause:** `app.config.ts` and `src/supabase.ts` had different key-variable fallbacks, and native builds loaded `.env`/`.env.local` rather than `.env.staging` by default.
+**Avoid:** Keep the runtime client and Expo config fallbacks aligned, explicitly load the intended environment for each build, and inspect the compiled bundle's backend project ref before installing or testing it.
+
 ### 2026-10-06 — announce the language toggle's actual destination
 
 **Bug:** After switching to English, the language control's screen-reader label still announced “Switch to English” even though tapping it switched back to Hindi.
